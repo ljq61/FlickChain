@@ -42,13 +42,13 @@ describe('production physics and session lifecycle', () => {
     expect(game.selectCoin('B')).toBe(true);
     expect(game.view).toMatchObject({ phase: 'ready', activeCoinId: 'B', scores: [0, 0], shotCount: 0, revision: initial.revision + 3 });
     expect(game.frame).toEqual(board);
-    expect(game.shoot({ x: -1, z: 0 }, 0.7)).toBe(true);
+    expect(game.shoot({ x: -1, z: 0 }, 0.42)).toBe(true);
     expect(game.view).toMatchObject({ phase: 'simulating', activeCoinId: 'B', canSelectCoin: false });
     expect(game.selectCoin('A')).toBe(false);
   });
   it('does not score or delete at first contact; commits final relay once', async () => {
     const game = await session();
-    expect(game.shoot({ x: 1, z: 0 }, 0.7)).toBe(true);
+    expect(game.shoot({ x: 1, z: 0 }, 0.42)).toBe(true);
     let bMoved = false;
     for (let i = 0; i < 80; i++) {
       game.tick(1 / 120);
@@ -79,7 +79,7 @@ describe('production physics and session lifecycle', () => {
   it.each(['challenge', 'battle'] as const)('locks %s continuation to B after A legally hits B', async (mode) => {
     const game = await session(level([['A', -0.22, 0], ['B', 0, 0], ['C', 0.16, 0]]), mode);
     const cStart = game.frame.coins.find((coin) => coin.id === 'C')!.position;
-    game.shoot({ x: 1, z: 0 }, 0.85);
+    game.shoot({ x: 1, z: 0 }, 0.51);
     finish(game);
     expect(game.view).toMatchObject({ phase: 'ready', scores: [1, 0], activeCoinId: 'B', remaining: 2, chain: 1, canSelectCoin: false });
     expect(game.view.foulReasons).toEqual([]);
@@ -124,7 +124,7 @@ describe('production physics and session lifecycle', () => {
   });
   it('a non-source fall after contact invalidates a would-be final relay', async () => {
     const game = await session(level([['A', 0.13, 0], ['B', 0.42, 0]]));
-    game.shoot({ x: 1, z: 0 }, 0.8); finish(game);
+    game.shoot({ x: 1, z: 0 }, 0.55); finish(game);
     expect(game.view.phase).toBe('failed'); expect(game.view.foulReasons).toContain('FALL'); expect(game.view.scores).toEqual([0, 0]);
     expect(game.frame.coins.some((coin) => coin.id === 'A')).toBe(true);
   });
@@ -146,7 +146,7 @@ describe('production physics and session lifecycle', () => {
     expect(game.view.canSelectCoin).toBe(true);
     expect(game.selectCoin('B')).toBe(true);
     expect(game.selectCoin('A')).toBe(true);
-    game.shoot({ x: 1, z: 0 }, 0.6); game.tick(1 / 60); game.pause();
+    game.shoot({ x: 1, z: 0 }, 0.36); game.tick(1 / 60); game.pause();
     const frame = game.frame;
     game.tick(100); expect(game.frame).toEqual(frame); expect(game.shoot({ x: 1, z: 0 }, 0.6)).toBe(false);
     game.resume(); game.tick(0); expect(game.frame).toEqual(frame); finish(game);
@@ -157,7 +157,7 @@ describe('production physics and session lifecycle', () => {
   it('consumes true coin and wall feedback once, clearing paused and disposed queues', async () => {
     const game = await session();
     expect(game.drainFeedback()).toEqual([]);
-    game.shoot({ x: 1, z: 0 }, 0.7);
+    game.shoot({ x: 1, z: 0 }, 0.42);
     let coin = false;
     for (let i = 0; i < 100 && !coin; i++) { game.tick(1 / 120); coin = game.drainFeedback().includes('coin'); }
     expect(coin).toBe(true); expect(game.drainFeedback()).toEqual([]);
@@ -167,7 +167,7 @@ describe('production physics and session lifecycle', () => {
     const layout = level([['A', -0.12, 0], ['B', -0.3, 0.3]]);
     layout.obstacles = [{ id: 'wall', x: 0.16, z: 0, width: 0.006, depth: 0.6 }];
     const wall = await session(layout);
-    wall.shoot({ x: 1, z: 0 }, 1);
+    wall.shoot({ x: 1, z: 0 }, 0.6);
     let wallHit = false;
     for (let i = 0; i < 100 && !wallHit; i++) { wall.tick(1 / 120); wallHit = wall.drainFeedback().includes('wall'); }
     expect(wallHit).toBe(true); expect(wall.drainFeedback()).toEqual([]);
@@ -175,7 +175,7 @@ describe('production physics and session lifecycle', () => {
     finish(wall); expect(wall.view.foulReasons).toEqual(['MISS']);
 
     for (const action of ['pause', 'dispose'] as const) {
-      const pending = await session(); pending.shoot({ x: 1, z: 0 }, 0.7);
+      const pending = await session(); pending.shoot({ x: 1, z: 0 }, 0.42);
       for (let i = 0; i < 60; i++) pending.tick(1 / 120);
       pending[action](); expect(pending.drainFeedback()).toEqual([]);
       pending.tick(1); expect(pending.drainFeedback()).toEqual([]);
@@ -184,10 +184,10 @@ describe('production physics and session lifecycle', () => {
   it('does not partially commit a relay whose fixed support precheck fails', async () => {
     const game = await session();
     vi.spyOn(PhysicsWorld.prototype, 'canRemoveSource').mockReturnValue(false);
-    game.shoot({ x: 1, z: 0 }, 0.7); finish(game);
+    game.shoot({ x: 1, z: 0 }, 0.42); finish(game);
     expect(game.view).toMatchObject({ phase: 'error', scores: [0, 0], remaining: 2, activeCoinId: 'A' });
     expect(game.frame.coins.map((coin) => coin.id)).toEqual(['A', 'B']);
-    expect(game.shoot({ x: 1, z: 0 }, 0.7)).toBe(false);
+    expect(game.shoot({ x: 1, z: 0 }, 0.42)).toBe(false);
     expect(game.selectCoin('B')).toBe(false);
   });
   it('TIMEOUT freezes, scores zero, and continues Battle only with supported survivors', async () => {

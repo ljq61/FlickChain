@@ -4,6 +4,7 @@ import { COIN_RADIUS, COIN_THICKNESS, PHYSICS_CONFIG } from '../physics/Material
 import { tableContainsPoint } from '../physics/TableGeometry';
 import type { AimPreview, GameView, LevelConfig, Vec3, WorldFrame } from '../types/contracts';
 import { FlickFinger } from './FlickFinger';
+import { CoinArrival } from './CoinArrival';
 
 const TABLE_THICKNESS = PHYSICS_CONFIG.tableThickness;
 const GLOW_COLOR = 0xff9d42;
@@ -101,6 +102,7 @@ export class SceneManager {
   private readonly shadowGeometry = new THREE.PlaneGeometry(COIN_RADIUS * 3.7, COIN_RADIUS * 3.7);
   private readonly glowLight = new THREE.PointLight(GLOW_COLOR, 0, 0.45, 2);
   private readonly finger = new FlickFinger();
+  private readonly arrival = new CoinArrival();
   private readonly observer: ResizeObserver;
   private readonly cameraFocus = new THREE.Vector3();
   private readonly desiredFocus = new THREE.Vector3();
@@ -195,7 +197,12 @@ export class SceneManager {
   focusCoin(id: string | null): void { this.focusId = id; }
   clearFocus(): void { this.focusId = null; }
 
+  beginCoinArrival(ids: string[]): void { this.arrival.begin(ids, this.reducedMotion.matches); }
+  get isIntroducing(): boolean { return this.arrival.playing; }
+  advanceCoinArrival(seconds: number): string[] { return this.arrival.advance(seconds); }
+
   setLevel(level: LevelConfig): void {
+    this.arrival.begin([]);
     this.table = level.table;
     this.focusId = null;
     this.cameraFocus.set(0, 0, 0);
@@ -269,8 +276,8 @@ export class SceneManager {
       this.coinMeshes.delete(id);
       this.coinShadows.delete(id);
     }
-    const ready = view?.phase === 'ready';
-    const selecting = view?.phase === 'selecting';
+    const ready = view?.phase === 'ready' && !this.arrival.playing;
+    const selecting = view?.phase === 'selecting' && !this.arrival.playing;
     const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.008);
     this.glowMaterial.emissiveIntensity = 0.25 + 1.05 * pulse;
     let glowAt: THREE.Vector3 | null = null;
@@ -289,11 +296,15 @@ export class SceneManager {
       }
       mesh.position.set(transform.position.x, transform.position.y, transform.position.z);
       mesh.quaternion.set(transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
+      const arrival = this.arrival.pose(transform.id);
+      mesh.position.y += arrival.height;
+      mesh.rotateX(arrival.tilt);
+      mesh.rotateY(arrival.yaw);
       const onTable = transform.position.y >= -0.004 && transform.position.y < 0.07 && tableContainsPoint(frame.table, transform.position.x, transform.position.z);
       const shadow = this.coinShadows.get(transform.id)!;
       shadow.position.set(transform.position.x, 0.0005, transform.position.z);
       shadow.visible = onTable;
-      (shadow.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - transform.position.y * 10);
+      (shadow.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - mesh.position.y * 5);
       // The active coin breathes with a warm glow; coins still waiting to be picked keep a faint shimmer.
       const highlighted = onTable && ready && view.activeCoinId === transform.id;
       (mesh.userData.body as THREE.Mesh).material = highlighted ? this.glowMaterial : onTable && selecting ? this.idleGlowMaterial : this.brassMaterial;

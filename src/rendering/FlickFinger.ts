@@ -5,6 +5,7 @@ import type { Vec3 } from '../types/contracts';
 
 const BONE_NAMES = ['hand_root', 'index_mcp', 'index_pip', 'index_dip'];
 const SURFACE_SPACING = 0.012;
+const HAND_SCALE = 0.8;
 const MODEL_URL = `${import.meta.env.BASE_URL}models/flick-hand.glb`;
 
 interface SurfacePoint {
@@ -78,6 +79,7 @@ export class FlickFinger extends THREE.Group {
       candidate = gltf.scene;
       if (this.disposed) throw new Error('Hand has been disposed');
       const clip = this.validateAsset(gltf);
+      candidate.scale.multiplyScalar(HAND_SCALE);
       mixer = new THREE.AnimationMixer(candidate);
       const action = mixer.clipAction(clip);
       action.setLoop(THREE.LoopOnce, 1);
@@ -88,17 +90,32 @@ export class FlickFinger extends THREE.Group {
       mixer.update(0);
       candidate.updateMatrixWorld(true);
       const markers = Array.from({ length: 8 }, (_, index) => candidate!.getObjectByName(`hit_axis_${String(index).padStart(2, '0')}`)!);
+      const idleHeight = markers[0].getWorldPosition(new THREE.Vector3()).y;
       for (const marker of markers) {
         const point = marker.getWorldPosition(new THREE.Vector3());
-        if (Math.abs(point.x) > 0.0003 || Math.abs(point.y - 0.025) > 0.001) throw new Error(`Hand marker ${marker.name} must lie on the horizontal idle index axis`);
+        if (![point.x, point.y, point.z].every(Number.isFinite) || idleHeight <= 0 || Math.abs(point.x) > 0.0003 || Math.abs(point.y - idleHeight) > 0.001) {
+          throw new Error(`Hand marker ${marker.name} must lie on the horizontal idle index axis above the table`);
+        }
       }
       const idleTip = markers[7].getWorldPosition(new THREE.Vector3());
+      if (idleTip.z <= 0) throw new Error('Hand idle index tip must extend along +Z');
       const surfaces = this.sampleSurfaces(candidate);
       if (this.disposed) throw new Error('Hand has been disposed');
       candidate.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         object.castShadow = object.receiveShadow = true;
         object.frustumCulled = false;
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+          material.color.set('#d9a181');
+          material.metalness = 0;
+          material.roughness = 0.65;
+          if (material instanceof THREE.MeshPhysicalMaterial) {
+            material.ior = 1.4;
+            material.specularIntensity = 0.35;
+            material.specularColor.set('#ffffff');
+          }
+        }
       });
       this.model = candidate;
       this.mixer = mixer;

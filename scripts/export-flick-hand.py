@@ -1,17 +1,11 @@
-"""Re-export the task's asset collection, leaving the original scene untouched."""
-import bpy
+"""Export the current artist hand. Open blender/pointing-hand-rigged.blend first.
+
+Console invocation: set path to this script, then
+exec(compile(open(path).read(), path, 'exec'), {'__file__': path})
+
+The old procedural create-flick-hand.py is retained as historical source;
+this entry point exports the artist's updated rig and weights instead.
+"""
 from pathlib import Path
-ROOT = Path('F:/workproject/FlickChain')
-scene = bpy.data.scenes['FlickChain_Hand_Studio']
-bpy.context.window.scene = scene
-scene.frame_set(0)
-bpy.ops.object.select_all(action='DESELECT')
-for obj in bpy.data.collections['FlickHand_Asset'].objects:
-    obj.select_set(True)
-bpy.context.view_layer.objects.active = bpy.data.objects['FlickHand_Rig']
-bpy.ops.export_scene.gltf(filepath=str(ROOT/'public/models/flick-hand.glb'),
-    export_format='GLB',use_selection=True,export_animation_mode='ACTIONS',
-    export_animations=True,export_skins=True,export_yup=True,
-    export_force_sampling=True,export_frame_range=True)
-bpy.data.libraries.write(str(ROOT/'assets/flick-hand.blend'), {scene}, fake_user=True)
-print('Exported FlickCharge action and standalone source blend')
+script = Path(__file__).resolve().with_name('export-pointing-hand.py')
+exec(compile(script.read_text(), str(script), 'exec'), {'__file__': str(script)})

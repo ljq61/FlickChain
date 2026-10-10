@@ -75,6 +75,27 @@ describe('real Rapier 3D world', () => {
     expect(world.applyShot('A', { x: 1, z: 0 }, 1)).toBe(false);
     expect(world.frame.coins).toEqual([]);
   });
+  it.each(Array.from({ length: 8 }, (_, i) => i * Math.PI / 4))('keeps a full-power shot on the near side of a thin wall at yaw %s', async (yaw) => {
+    const direction = { x: Math.cos(yaw), z: Math.sin(yaw) };
+    const layout = level([['A', 0, 0], ['B', -0.37, -0.61]]);
+    layout.obstacles = [{ id: 'wall', x: direction.x * 0.28, z: direction.z * 0.28, width: 0.006, depth: 0.6, rotation: -yaw }];
+    const world = await PhysicsWorld.create(layout);
+    try {
+      expect(world.applyShot('A', direction, 1)).toBe(true);
+      let previous = 0, reversed = false, wallContacts = 0;
+      for (let i = 0; i < 240; i++) {
+        const events = world.step();
+        wallContacts += events.feedback.filter((entry) => entry === 'wall').length;
+        const position = world.frame.coins.find((coin) => coin.id === 'A')!.position;
+        const forward = position.x * direction.x + position.z * direction.z;
+        expect(forward).toBeLessThan(0.28 - 0.003 - 0.035 + 0.003);
+        reversed ||= forward < previous - 0.001;
+        previous = forward;
+      }
+      expect(reversed).toBe(true);
+      expect(wallContacts).toBe(1);
+    } finally { world.dispose(); }
+  });
   it('uses a true circular top: a diagonal shot tips and falls inside the old bounding square', async () => {
     const layout = level([['A', 0.5, 0.5], ['B', -0.3, 0]]);
     layout.table = { shape: 'circle', width: 1.6, depth: 1.6, materialId: 'wood' };
@@ -83,8 +104,10 @@ describe('real Rapier 3D world', () => {
     try {
       expect(circle.isSettled()).toBe(true);
       expect(circle.frame.coins[0].position.y).toBeCloseTo(COIN_THICKNESS / 2, 2);
-      expect(circle.applyShot('A', { x: 1, z: 1 }, 0.55)).toBe(true);
-      expect(rectangle.applyShot('A', { x: 1, z: 1 }, 0.55)).toBe(true);
+      // Keep this geometry comparison at the former impulse, now below half charge.
+      const geometryPower = 0.55 * 2 ** (-1 / 1.35);
+      expect(circle.applyShot('A', { x: 1, z: 1 }, geometryPower)).toBe(true);
+      expect(rectangle.applyShot('A', { x: 1, z: 1 }, geometryPower)).toBe(true);
       const falls: string[] = [];
       let tipped = false;
       for (let i = 0; i < 300; i++) {

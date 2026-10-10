@@ -2,8 +2,8 @@
   {
     "levelId": "first-flick",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v1",
-    "configFingerprint": "808be56e3e925c7fb37fa2a6a67eabd1e271684466193b8b6bede2e6cca28d0d",
+    "configVersion": "wood-standard-v2",
+    "configFingerprint": "c74ab82ba2ab448c1f694c12635ac0c36746f32bdc6136f67c2cd7a1ea778f51",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -12,93 +12,93 @@
           "x": 1,
           "z": 0
         },
-        "power": 0.65
+        "power": 0.4
       }
     ]
   },
   {
     "levelId": "distance",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v1",
-    "configFingerprint": "4469853ab13f7ae45934893854d36384622234eb62654387f9d660151d75c125",
+    "configVersion": "wood-standard-v2",
+    "configFingerprint": "f8d51f986314c6d0ab2f06c18e9ee2e2cb8d601697d36309f125a25dab04ac3f",
     "shots": [
       {
         "sourceCoinId": "a",
         "targetCoinId": "b",
         "direction": {
-          "x": 6.123233995736766e-17,
+          "x": 1.6714577709334716e-14,
           "z": -1
         },
-        "power": 0.85
+        "power": 0.5
       }
     ]
   },
   {
     "levelId": "turn-the-corner",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v1",
-    "configFingerprint": "47e2b390e2fb250be4bfa5c34625131c0b856a98858a6297eacfdac2c721600f",
+    "configVersion": "wood-standard-v2",
+    "configFingerprint": "612bf5909394d591379e45d28a4ade8cb09e0b0f0ad5b2c93a564b4ec7aa0cc3",
     "shots": [
       {
         "sourceCoinId": "a",
         "targetCoinId": "b",
         "direction": {
-          "x": 0.9344877635535738,
-          "z": -0.3559952524523889
+          "x": 0.9344877422820778,
+          "z": -0.3559953082900742
         },
-        "power": 0.75
+        "power": 0.45
       },
       {
         "sourceCoinId": "b",
         "targetCoinId": "c",
         "direction": {
-          "x": -0.708009390259585,
-          "z": -0.7062030184757431
+          "x": -0.7145320570000557,
+          "z": -0.699602701194949
         },
-        "power": 0.8
+        "power": 0.5
       }
     ]
   },
   {
     "levelId": "zigzag",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v1",
-    "configFingerprint": "e78a88a5be71398bed3bffc429aa91824536dcad64a5cd312ffc67a364a9ee27",
+    "configVersion": "wood-standard-v2",
+    "configFingerprint": "ce092d1c07b2042800d792d2a99dae5e2bad8efdbe7d7023d8bd110e1dbff485",
     "shots": [
       {
         "sourceCoinId": "a",
         "targetCoinId": "b",
         "direction": {
-          "x": 0.8982167519502942,
-          "z": -0.43955280287567705
+          "x": 0.898216735204885,
+          "z": -0.43955283709456083
         },
-        "power": 0.8
+        "power": 0.5
       },
       {
         "sourceCoinId": "b",
         "targetCoinId": "c",
         "direction": {
-          "x": -0.7822118654220678,
-          "z": -0.6230125180066038
+          "x": -0.8020708700101129,
+          "z": -0.5972288669188895
         },
-        "power": 0.8
+        "power": 0.5
       },
       {
         "sourceCoinId": "c",
         "targetCoinId": "d",
         "direction": {
-          "x": 0.8169774537774481,
-          "z": -0.5766696107992145
+          "x": 0.8375458236861166,
+          "z": -0.5463670865141351
         },
-        "power": 0.8
+        "power": 0.5
       }
     ]
   },
   {
     "levelId": "full-chain",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v1",
-    "configFingerprint": "ce302192147ca1cbfc91d96c42506591721ca1153b4e193a4c365aced9c73104",
+    "configVersion": "wood-standard-v2",
+    "configFingerprint": "9549bf2f67f59478642339724260d5ec7f897a2100efa44b8666ae979bf73143",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -107,34 +107,34 @@
           "x": 0.9056902270275956,
           "z": -0.42394010504634067
         },
-        "power": 0.8
+        "power": 0.5
       },
       {
         "sourceCoinId": "b",
         "targetCoinId": "c",
         "direction": {
-          "x": -0.8645923346711959,
-          "z": -0.5024739742790773
+          "x": -0.8845822572433982,
+          "z": -0.4663842087487251
         },
-        "power": 0.75
+        "power": 0.45
       },
       {
         "sourceCoinId": "c",
         "targetCoinId": "d",
         "direction": {
-          "x": 0.8581869956404788,
-          "z": -0.5133371996198686
+          "x": 0.8541373464940273,
+          "z": -0.5200474914122191
         },
-        "power": 0.8
+        "power": 0.5
       },
       {
         "sourceCoinId": "d",
         "targetCoinId": "e",
         "direction": {
-          "x": -0.8138910933672231,
-          "z": -0.5810174594084985
+          "x": -0.8169650470137664,
+          "z": -0.5766871872668878
         },
-        "power": 0.75
+        "power": 0.45
       }
     ]
   }

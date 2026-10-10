@@ -9,6 +9,10 @@ import type { GameMode, GameView, LevelConfig, WorldFrame } from '../../src/type
 const harness = vi.hoisted(() => ({
   sessions: [] as Array<{ view: GameView; frame: WorldFrame; dispose: ReturnType<typeof vi.fn> }>,
   handLoad: vi.fn(async () => {}),
+  arrivalCoins: false,
+  inputState: null as null | (() => { view: GameView | null; frame: WorldFrame | null }),
+  play: vi.fn(),
+  stopSounds: vi.fn(),
 }));
 
 vi.mock('../../src/core/GameSession', () => ({
@@ -19,7 +23,7 @@ vi.mock('../../src/core/GameSession', () => ({
           sessionId: `storage-test-${harness.sessions.length}`,
           revision: 0,
           mode,
-          phase: 'ready' as const,
+          phase: harness.arrivalCoins ? 'selecting' as const : 'ready' as const,
           levelId: level.id,
           activeCoinId: level.activeCoinId,
           canSelectCoin: true,
@@ -33,7 +37,7 @@ vi.mock('../../src/core/GameSession', () => ({
           winner: null,
           error: null,
         },
-        frame: { coins: [], table: level.table, obstacles: level.obstacles },
+        frame: { coins: harness.arrivalCoins ? level.coins.map(coin => ({ id: coin.id, materialId: 'standard' as const, position: { x: coin.x, y: 0.004, z: coin.z }, rotation: { x: 0, y: 0, z: 0, w: 1 } })) : [], table: level.table, obstacles: level.obstacles },
         tick: vi.fn(),
         drainFeedback: () => [],
         dispose: vi.fn(),
@@ -44,16 +48,26 @@ vi.mock('../../src/core/GameSession', () => ({
   },
 }));
 
-vi.mock('../../src/rendering/SceneManager', () => ({
-  SceneManager: class { initializeHand = harness.handLoad; setLevel = vi.fn(); render = vi.fn(); focusCoin = vi.fn(); clearFocus = vi.fn(); dispose = vi.fn(); },
-}));
+vi.mock('../../src/rendering/SceneManager', async () => {
+  const { CoinArrival } = await import('../../src/rendering/CoinArrival');
+  return { SceneManager: class {
+    arrival = new CoinArrival();
+    initializeHand = harness.handLoad; setLevel = vi.fn(); render = vi.fn(); focusCoin = vi.fn(); clearFocus = vi.fn(); dispose = vi.fn();
+    beginCoinArrival(ids: string[]) { this.arrival.begin(ids); }
+    advanceCoinArrival(seconds: number) { return this.arrival.advance(seconds); }
+    get isIntroducing() { return this.arrival.playing; }
+  } };
+});
 vi.mock('../../src/input/PointerInput', () => ({
-  PointerInput: class { cancel = vi.fn(); dispose = vi.fn(); charge = vi.fn(() => null); },
+  PointerInput: class {
+    constructor(_scene: unknown, getState: typeof harness.inputState) { harness.inputState = getState; }
+    cancel = vi.fn(); dispose = vi.fn(); charge = vi.fn(() => null);
+  },
 }));
 vi.mock('../../src/ui/SoundManager', () => ({
   SoundManager: class {
     enabled = true;
-    unlock = vi.fn(); play = vi.fn(); slide = vi.fn(); suspend = vi.fn(); dispose = vi.fn();
+    unlock = vi.fn(); play = harness.play; slide = vi.fn(); stopCurrentSounds = harness.stopSounds; suspend = vi.fn(); dispose = vi.fn();
   },
 }));
 
@@ -66,6 +80,8 @@ describe('app progress recovery and non-blocking save notices', () => {
 
   beforeEach(() => {
     harness.sessions.length = 0;
+    harness.arrivalCoins = false;
+    harness.inputState = null;
     harness.handLoad.mockReset().mockResolvedValue(undefined);
     frameTime = 0;
     raf = undefined;
@@ -147,6 +163,26 @@ describe('app progress recovery and non-blocking save notices', () => {
       expect(element('.flick-shell').dataset.screen).toBe(stage === 'boot' ? 'home' : 'game');
     });
     expect(harness.sessions.at(-1)!.view.levelId).toBe(LEVELS[0].id);
+  });
+
+  it('blocks gameplay input during arrival and emits exactly one landing sound per coin before restoring selection', async () => {
+    await initialize();
+    harness.arrivalCoins = true;
+    await startLevel();
+    expect(harness.inputState!().view).toBeNull();
+    expect(element('.flick-shell').dataset.phase).toBe('introducing');
+    expect(element('[data-el="prompt-title"]').textContent).toBe('硬币轻落桌面');
+    for (let i = 0; i < 70; i++) advanceFrame();
+    expect(harness.inputState!().view?.phase).toBe('selecting');
+    expect(element('.flick-shell').dataset.phase).toBe('selecting');
+    expect(harness.play.mock.calls.filter(([kind]) => kind === 'land')).toHaveLength(LEVELS[0].coins.length);
+    for (let i = 0; i < 20; i++) advanceFrame();
+    expect(harness.play.mock.calls.filter(([kind]) => kind === 'land')).toHaveLength(LEVELS[0].coins.length);
+    expect(harness.sessions.at(-1)!.view.shotCount).toBe(0);
+    const cleanupCount = harness.stopSounds.mock.calls.length;
+    element<HTMLButtonElement>('[data-action="home"]').click();
+    await vi.waitFor(() => expect(element('.flick-shell').dataset.screen).toBe('home'));
+    expect(harness.stopSounds).toHaveBeenCalledTimes(cleanupCount + 1);
   });
 
   it.each(['corrupt-json', 'read-security-error'] as const)('%s keeps first-level play available', async (failure) => {

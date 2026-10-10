@@ -47,7 +47,7 @@ export async function replayPrefix(level: LevelConfig, shots: ReplayShot[]): Pro
 /** Offline bounded search; each branch reconstructs from production input replay. */
 export async function discoverSolution(level: LevelConfig): Promise<{ solution: LevelSolution; candidates: number }> {
   let candidates = 0;
-  const powers = [0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1];
+  const powers = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1];
   const angles = [0, -0.025, 0.025, -0.05, 0.05];
   async function search(prefix: ReplayShot[]): Promise<ReplayShot[] | null> {
     const snapshot = await replayPrefix(level, prefix);

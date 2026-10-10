@@ -44,14 +44,21 @@ function meshVertices(hand: FlickFinger, meshName?: string, refresh = true): THR
   return vertices;
 }
 
-function fixedFistVertices(hand: FlickFinger): THREE.Vector3[] {
+function fixedSkinVertices(hand: FlickFinger): THREE.Vector3[] {
   const mesh = hand.getObjectByName('hand_skin') as THREE.SkinnedMesh;
-  const root = mesh.skeleton.bones.findIndex((bone) => bone.name === 'hand_root');
+  const moving = new Set(mesh.skeleton.bones.flatMap((bone, index) => {
+    let ancestor: THREE.Object3D | null = bone;
+    while (ancestor) {
+      if (['index_mcp', 'index_pip', 'index_dip'].includes(ancestor.name)) return [index];
+      ancestor = ancestor.parent;
+    }
+    return [];
+  }));
   const ids = mesh.geometry.getAttribute('skinIndex');
   const weights = mesh.geometry.getAttribute('skinWeight');
   const result: THREE.Vector3[] = [];
   for (let i = 0; i < weights.count; i++) {
-    const fixed = [0, 1, 2, 3].every((c) => weights.getComponent(i, c) < 1e-6 || ids.getComponent(i, c) === root);
+    const fixed = [0, 1, 2, 3].every((c) => weights.getComponent(i, c) < 1e-6 || !moving.has(ids.getComponent(i, c)));
     if (fixed) result.push(mesh.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld));
   }
   return result;
@@ -63,7 +70,7 @@ describe('the shipped Blender hand asset', () => {
   beforeEach(() => { hand = new FlickFinger(); hand.visible = true; });
   afterEach(() => { hand.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-  it('loads real skinned geometry, blends joint weights and places the straight finger behind the coin for any yaw', async () => {
+  it('loads real skinned geometry, blends joint weights and places the idle index axis behind the coin for any yaw', async () => {
     await hand.load(bytes);
     const skin = hand.getObjectByName('hand_skin') as THREE.SkinnedMesh;
     expect(skin).toBeInstanceOf(THREE.SkinnedMesh);
@@ -76,6 +83,8 @@ describe('the shipped Blender hand asset', () => {
       if (components.filter((value) => value > 0.001).length > 1) blended = true;
     }
     expect(blended).toBe(true);
+    const idleHeight = hand.getHitPoints()[0].y;
+    expect(idleHeight).toBeGreaterThan(0);
     for (let step = 0; step < 8; step++) {
       const yaw = step * Math.PI / 4;
       const aim = { x: Math.sin(yaw), z: Math.cos(yaw) };
@@ -84,41 +93,50 @@ describe('the shipped Blender hand asset', () => {
       expect(axis).toHaveLength(8);
       for (const point of axis) {
         expect((point.x - coin.x) * aim.z - (point.z - coin.z) * aim.x).toBeCloseTo(0, 6);
-        expect(point.y).toBeCloseTo(0.025, 6);
+        expect(point.y).toBeCloseTo(idleHeight, 6);
       }
       expect(Math.hypot(axis[7].x - coin.x, axis[7].z - coin.z)).toBeCloseTo(COIN_RADIUS + 0.002, 6);
       expect(hand.position.y).toBe(0);
+      // The artist mesh has its hand-back normal along local +Y after glTF conversion.
+      // Keep it above the palm for every aim yaw; the former export rolled it upside down.
+      const alignment = hand.getObjectByName('GameHand_Alignment')!;
+      const backNormal = new THREE.Vector3(0, 1, 0).transformDirection(alignment.matrixWorld);
+      expect(backNormal.y).toBeGreaterThan(0.99);
+      expect(alignment.matrixWorld.determinant()).toBeGreaterThan(0);
     }
   });
 
-  it('samples the exported bone animation progressively, deforms skin, leaves the fist fixed and reverses on cancellation', async () => {
+  it('samples meaningful exported motion, keeps unaffected skin fixed and reverses on cancellation', async () => {
     await hand.load(bytes);
     hand.setPose(coin, direction, 0);
     const idleAxis = hand.getHitPoints().slice(0, 8);
     const idleSkin = meshVertices(hand, 'hand_skin');
-    const idleFist = fixedFistVertices(hand);
-    expect(idleFist.length).toBeGreaterThan(1000);
+    const idleFixed = fixedSkinVertices(hand);
+    expect(idleFixed.length).toBeGreaterThan(0);
     const root = hand.position.clone();
-    let previous = COIN_RADIUS + 0.002 - 0.00001;
-    for (let step = 0; step <= 10; step++) {
-      hand.setPose(coin, direction, step / 10);
-      const points = hand.getHitPoints().slice(0, 8);
-      const retreat = Math.hypot(points[7].x - coin.x, points[7].z - coin.z);
-      expect(retreat).toBeGreaterThan(previous);
-      previous = retreat;
+    const poses = [idleSkin];
+    for (const power of [0.25, 0.5, 0.75, 1]) {
+      hand.setPose(coin, direction, power);
+      const skin = meshVertices(hand, 'hand_skin');
+      const previous = poses[poses.length - 1];
+      expect(Math.max(...skin.map((vertex, index) => vertex.distanceTo(previous[index])))).toBeGreaterThan(0.001);
+      poses.push(skin);
       expect(hand.position).toEqual(root);
+      expect(fixedSkinVertices(hand)).toEqual(idleFixed);
     }
+    // With the hand back up, flexion moves the tip down toward the palm/table.
+    expect(hand.getHitPoints()[7].y).toBeLessThan(idleAxis[7].y - 0.01);
     const chargedSkin = meshVertices(hand, 'hand_skin');
-    expect(Math.max(...chargedSkin.map((vertex, index) => vertex.distanceTo(idleSkin[index])))).toBeGreaterThan(0.03);
-    expect(fixedFistVertices(hand)).toEqual(idleFist);
-    const charged = hand.getHitPoints();
-    expect(Math.max(...charged.slice(0, 8).map((p) => p.y))).toBeGreaterThan(charged[7].y + 0.02);
-    hand.setPose(coin, direction, 0);
+    expect(Math.max(...chargedSkin.map((vertex, index) => vertex.distanceTo(idleSkin[index])))).toBeGreaterThan(0.015);
+    for (let step = 3; step >= 0; step--) {
+      hand.setPose(coin, direction, step / 4);
+      expect(meshVertices(hand, 'hand_skin')).toEqual(poses[step]);
+    }
     expect(hand.getHitPoints().slice(0, 8)).toEqual(idleAxis);
     expect(meshVertices(hand, 'hand_skin')).toEqual(idleSkin);
   });
 
-  it('ships one closed connected hand skin and keeps every exported seam together throughout charge', async () => {
+  it('preserves the artist open skin regions and keeps animated faces and any export seams intact', async () => {
     await hand.load(bytes);
     expect(hand.getObjectByName('fist')).toBeUndefined();
     expect(hand.getObjectByName('index_skin')).toBeUndefined();
@@ -150,22 +168,43 @@ describe('the shipped Blender hand asset', () => {
         neighbors.get(b)!.add(a);
       }
     }
-    expect([...edges.values()].every((count) => count === 2)).toBe(true);
+    expect([...edges.values()].every((count) => count === 1 || count === 2)).toBe(true);
+    expect([...edges.values()].some((count) => count === 1)).toBe(true);
     const visited = new Set<number>();
-    const stack = [welded[0]];
-    while (stack.length) {
-      const vertex = stack.pop()!;
-      if (visited.has(vertex)) continue;
-      visited.add(vertex);
-      for (const next of neighbors.get(vertex) ?? []) if (!visited.has(next)) stack.push(next);
+    let components = 0;
+    for (const vertex of groups.values()) {
+      if (visited.has(vertex[0])) continue;
+      components++;
+      const stack = [vertex[0]];
+      while (stack.length) {
+        const current = stack.pop()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        for (const next of neighbors.get(current) ?? []) if (!visited.has(next)) stack.push(next);
+      }
     }
+    expect(components).toBe(2);
     expect(visited.size).toBe(groups.size);
+    // This artist mesh has two authored regions and an open cuff. A future
+    // split at export seams must keep duplicated positions coincident.
+    const seams = [...groups.values()].filter((group) => group.length > 1);
     hand.setPose(coin, direction, 0);
-    const fixed = fixedFistVertices(hand);
+    const fixed = fixedSkinVertices(hand);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
     for (let frame = 0; frame <= 24; frame++) {
       hand.setPose(coin, direction, frame / 24);
-      expect(fixedFistVertices(hand)).toEqual(fixed);
-      for (const group of groups.values()) {
+      expect(fixedSkinVertices(hand)).toEqual(fixed);
+      let smallestFace = Infinity;
+      for (let offset = 0; offset < indices.count; offset += 3) {
+        skin.getVertexPosition(indices.getX(offset), a);
+        skin.getVertexPosition(indices.getX(offset + 1), b);
+        skin.getVertexPosition(indices.getX(offset + 2), c);
+        const area = b.sub(a).cross(c.sub(a)).length();
+        expect(Number.isFinite(area)).toBe(true);
+        smallestFace = Math.min(smallestFace, area);
+      }
+      expect(smallestFace).toBeGreaterThan(1e-12);
+      for (const group of seams) {
         const first = skin.getVertexPosition(group[0], new THREE.Vector3());
         for (const index of group.slice(1)) expect(skin.getVertexPosition(index, new THREE.Vector3()).distanceTo(first)).toBeLessThan(1e-7);
       }
@@ -212,7 +251,9 @@ describe('the shipped Blender hand asset', () => {
     let nearest = -Infinity;
     for (let step = 0; step <= 24; step++) {
       hand.setPose(coin, direction, step / 24, step > 16 ? 1 + step / 17 : 0);
+      for (const point of hand.getHitPoints()) expect([point.x, point.y, point.z].every(Number.isFinite)).toBe(true);
       for (const vertex of meshVertices(hand)) {
+        expect(vertex.toArray().every(Number.isFinite)).toBe(true);
         lowest = Math.min(lowest, vertex.y);
         nearest = Math.max(nearest, (vertex.x - coin.x) * direction.x + (vertex.z - coin.z) * direction.z);
       }
@@ -283,7 +324,11 @@ describe('the shipped Blender hand asset', () => {
     await first;
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0][0])).toMatch(/models\/flick-hand\.glb$/);
-    expect(hand.getHitPoints()[3].y).toBeGreaterThan(0.03);
+    const loadedPose = hand.getHitPoints();
+    hand.setPose(coin, direction, 0);
+    expect(loadedPose).not.toEqual(hand.getHitPoints());
+    hand.setPose(coin, direction, 0.5);
+    expect(hand.getHitPoints()).toEqual(loadedPose);
     await hand.load();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -295,6 +340,25 @@ describe('the shipped Blender hand asset', () => {
       expect(hand.getHitPoints()).toEqual([]);
     }
     await expect(hand.load(editAssetJSON((json) => { json.animations[0].name = 'WrongClip'; }))).rejects.toThrow('FlickCharge');
+    await hand.load(bytes);
+    expect(hand.getHitPoints().length).toBeGreaterThan(8);
+  });
+
+  it('rejects idle axes off the horizontal line, below the table or extending backward', async () => {
+    await expect(hand.load(editAssetJSON((json) => {
+      json.nodes.find((node: any) => node.name === 'hit_axis_07').translation = [1, 1, 1];
+    }))).rejects.toThrow('horizontal idle index axis');
+    for (const [component, message] of [[1, 'above the table'], [2, '+Z']] as const) {
+      const invalid = editAssetJSON((json) => {
+        for (const index of json.scenes[json.scene ?? 0].nodes) {
+          const node = json.nodes[index];
+          node.translation ??= [0, 0, 0];
+          node.translation[component] -= 1;
+        }
+      });
+      await expect(hand.load(invalid)).rejects.toThrow(message);
+      expect(hand.getHitPoints()).toEqual([]);
+    }
     await hand.load(bytes);
     expect(hand.getHitPoints().length).toBeGreaterThan(8);
   });

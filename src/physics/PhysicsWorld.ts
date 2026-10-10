@@ -26,7 +26,7 @@ export class PhysicsWorld {
   private frozen = false;
   private constructor(private readonly level: LevelConfig) {
     this.world = new RAPIER.World({ x: 0, y: PHYSICS_CONFIG.gravity, z: 0 });
-    this.world.timestep = PHYSICS_CONFIG.fixedDt;
+    this.world.timestep = PHYSICS_CONFIG.fixedDt / PHYSICS_CONFIG.integrationSubsteps;
     this.world.numSolverIterations = PHYSICS_CONFIG.solverIterations;
     this.events = new RAPIER.EventQueue(true);
     const tableDesc = level.table.shape === 'circle'
@@ -90,6 +90,22 @@ export class PhysicsWorld {
     return true;
   }
   step(): PhysicsEvents {
+    const contacts: [string, string][] = [];
+    const fallenCoinIds: string[] = [];
+    const feedback = new Set<PhysicsFeedback>();
+    // Keep the public/AI clock fixed while resolving faster impacts in smaller
+    // real Rapier steps. Drain each step so brief contacts are never discarded.
+    for (let i = 0; i < PHYSICS_CONFIG.integrationSubsteps; i++) {
+      const events = this.stepSubstep();
+      for (const pair of events.contacts) {
+        if (!contacts.some(([left, right]) => left === pair[0] && right === pair[1])) contacts.push(pair);
+      }
+      fallenCoinIds.push(...events.fallenCoinIds);
+      for (const sound of events.feedback) feedback.add(sound);
+    }
+    return { contacts, fallenCoinIds, feedback: [...feedback] };
+  }
+  private stepSubstep(): PhysicsEvents {
     if (this.disposed || this.frozen) return { contacts: [], fallenCoinIds: [], feedback: [] };
     this.world.step(this.events);
     const contacts: [string, string][] = [];
@@ -111,12 +127,16 @@ export class PhysicsWorld {
       if (![position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, rotation.w].every(Number.isFinite)) throw new Error('物理世界出现非有限位姿');
       if (position.y < PHYSICS_CONFIG.fallY && !this.fallen.has(id)) { this.fallen.add(id); fallenCoinIds.push(id); }
       const onTable = this.supported(coin);
-      const edge = tableClearance(this.level.table, position.x, position.z) < COIN_RADIUS * PHYSICS_CONFIG.edgeUnlockRadiusFraction;
-      if ((!onTable || edge) && !coin.free) {
+      // A rim overhang is stable while the centre of mass remains on the table.
+      // Losing a contact for one solver step must not release the tilt axes.
+      const edge = tableClearance(this.level.table, position.x, position.z) <= 0;
+      const airborne = position.y > COIN_THICKNESS / 2 + PHYSICS_CONFIG.supportTolerance
+        || position.y < PHYSICS_CONFIG.minSupportedCenterY;
+      if ((airborne || edge) && !coin.free) {
         coin.free = true; coin.supportSteps = 0;
         coin.body.setEnabledRotations(true, true, true, true);
       } else if (onTable && !edge && coin.free) {
-        coin.supportSteps++;
+        coin.supportSteps += 1 / PHYSICS_CONFIG.integrationSubsteps;
         // Re-lock only an upright, quiet re-landing; never teleport its pose.
         if (coin.supportSteps >= PHYSICS_CONFIG.resupportSteps && Math.abs(rotation.x) + Math.abs(rotation.z) < PHYSICS_CONFIG.uprightQuaternionTolerance && this.quiet(coin)) {
           coin.free = false; coin.body.setEnabledRotations(false, true, false, false);

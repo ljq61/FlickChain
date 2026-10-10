@@ -1,87 +1,37 @@
 {
-  "blender": "5.1.2",
-  "scene": "FlickChain_Hand_Studio",
-  "bones": [
-    "hand_root",
-    "index_mcp",
-    "index_curve_01",
-    "index_curve_02",
-    "index_curve_03",
-    "index_curve_04",
-    "index_pip",
-    "index_curve_06",
-    "index_curve_07",
-    "index_dip",
-    "index_curve_09",
-    "index_curve_10"
+  "blender": "5.2.1 LTS",
+  "source": "blender/pointing-hand-rigged.blend",
+  "scene": "FlickChain_Artist_Hand",
+  "source_action": "Index_Curl",
+  "source_frames": [
+    12,
+    36
   ],
   "clip": "FlickCharge",
   "frames": [
     0,
-    24
+    30
   ],
-  "topology": {
-    "components": 1,
-    "boundary_edges": 0,
-    "non_manifold_edges": 0,
-    "signed_volume": 0.000492836486487671
-  },
-  "pose_min_y": [
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167,
-    0.003147659357637167
+  "fps": 30,
+  "scale": 0.24,
+  "orientation": "hand_back_up",
+  "idle_axis_height": 0.057777802336215975,
+  "table_clearance": 0.003,
+  "bones": [
+    "hand_root",
+    "Thumb",
+    "index_mcp",
+    "index_pip",
+    "index_dip",
+    "Index_03.001",
+    "Index_02.001",
+    "Index_01.001"
   ],
   "meshes": {
     "hand_skin": {
-      "vertices": 4073,
-      "faces": 6950
-    },
-    "knuckle_crease_0": {
-      "vertices": 18,
-      "faces": 8
-    },
-    "knuckle_crease_1": {
-      "vertices": 18,
-      "faces": 8
-    },
-    "knuckle_crease_2": {
-      "vertices": 18,
-      "faces": 8
-    },
-    "index_nail": {
-      "vertices": 48,
-      "faces": 38
-    },
-    "cuff": {
-      "vertices": 64,
-      "faces": 50
-    },
-    "sleeve": {
-      "vertices": 64,
-      "faces": 50
+      "vertices": 1647,
+      "faces": 1857
     }
   },
-  "glb_bytes": 264232
+  "glb_bytes": 106380
 }

@@ -36,15 +36,17 @@ npm run validate:levels
 The bounded offline search uses the production `GameSession`, full settlement
 and Rapier physics for every candidate. It reconstructs branches from previous
 inputs and frees every world. It searches nearby straight-line angles and powers,
-with a 500-candidate limit per level; this is a content verification tool rather
-than production AI.
+with normalized powers from 0.3 to 1 and a 500-candidate limit per level; this is
+a content verification tool rather than production AI.
 
-On 2026-10-10, the five circular levels passed all 24 schema/replay checks; the one
+On 2026-10-11, the five circular levels passed all 24 schema/replay checks; the one
 opt-in generator test was skipped in normal acceptance. Complete solutions used
-1, 1, 2, 3 and 4 shots respectively. Candidate counts were 2, 6, 9, 15 and 18;
-search took about 1.1 seconds in the local Node run. The complete inputs and
-configuration fingerprints were regenerated through production Rapier after
-the geometry change. Every submitted stage also
+1, 1, 2, 3 and 4 shots respectively, with powers from 0.4 to 0.5. Candidate counts
+were 3, 5, 9, 15 and 18; search took about 1.25 seconds in the local Node run.
+The complete inputs and configuration fingerprints were explicitly regenerated
+through production Rapier for `wood-standard-v2`: maximum impulse 0.048 N·s,
+120 Hz fixed gameplay steps and two 240 Hz integration substeps per fixed step.
+The level layouts were unchanged. Every submitted stage also
 passed the production 90-step initial stabilization. These figures describe this
 local run only. Browser mouse/touch control, phone performance, perceived
 difficulty and cross-device replay behavior require separate acceptance.

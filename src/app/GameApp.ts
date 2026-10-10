@@ -5,6 +5,8 @@ import { SaveAdapter, type SaveData } from '../platform/SaveAdapter';
 import { SceneManager } from '../rendering/SceneManager';
 import { Shell } from '../ui/Shell';
 import { SoundManager } from '../ui/SoundManager';
+import { COIN_THICKNESS } from '../physics/MaterialRegistry';
+import { tableContainsPoint } from '../physics/TableGeometry';
 import type { AimPreview, Direction, GameMode, GameView, WorldFrame } from '../types/contracts';
 
 export class GameApp {
@@ -17,6 +19,7 @@ export class GameApp {
   private session: GameSession | null = null;
   private aim: AimPreview | null = null;
   private charging = false;
+  private impactIntensity = 0.5;
   private lastFrame: WorldFrame | null = null;
   private menu = true;
   private loading = false;
@@ -40,7 +43,7 @@ export class GameApp {
     });
     this.scene = new SceneManager(this.shell.canvasHost);
     this.pointer = new PointerInput(this.scene, () => ({
-      view: this.menu || this.loading ? null : this.session?.view ?? null,
+      view: this.menu || this.loading || this.scene.isIntroducing ? null : this.session?.view ?? null,
       frame: this.session?.frame ?? null,
     }), {
       shoot: (direction, power) => this.shoot(direction, power),
@@ -66,6 +69,7 @@ export class GameApp {
     this.aim = null;
     this.lastFrame = null;
     this.previousView = null;
+    this.sound.stopCurrentSounds();
     this.session?.dispose();
     this.session = null;
     this.shell.setError(null);
@@ -79,10 +83,11 @@ export class GameApp {
       this.menu = menu;
       this.scene.setLevel(level);
       this.scene.clearFocus();
+      this.scene.beginCoinArrival(menu ? [] : candidate.frame.coins.map(coin => coin.id));
       this.previousTime = 0;
       this.loading = false;
       this.shell.setLoading(null);
-      this.shell.render(menu ? null : candidate.view, this.progress.completed, this.progress.sound);
+      this.shell.render(menu ? null : candidate.view, this.progress.completed, this.progress.sound, this.scene.isIntroducing);
       this.shell.setNotice(this.save.lastError);
     } catch (error) {
       if (this.disposed || generation !== this.generation) return;
@@ -107,12 +112,15 @@ export class GameApp {
 
   private shoot(direction: Direction, power: number): void {
     this.sound.unlock();
-    if (!this.menu && !this.loading && this.session?.shoot(direction, power)) this.sound.play('flick');
+    if (!this.menu && !this.loading && !this.scene.isIntroducing && this.session?.shoot(direction, power)) {
+      this.impactIntensity = 0.3 + power * 0.7;
+      this.sound.play('flick', power);
+    }
   }
 
   /** Entry/turn launch choices stay editable until firing; relay targets stay fixed. */
   private pickCoin(id: string): void {
-    if (this.menu || this.loading || !this.session) return;
+    if (this.menu || this.loading || this.scene.isIntroducing || !this.session) return;
     const view = this.session.view;
     if (!view.canSelectCoin || !['selecting', 'ready'].includes(view.phase) || !this.session.frame.coins.some((coin) => coin.id === id)) return;
     if (!this.session.selectCoin(id)) return;
@@ -170,7 +178,7 @@ export class GameApp {
     else this.sound.suspend();
     this.save.write(this.progress);
     this.shell.setNotice(this.save.lastError);
-    this.shell.render(this.menu ? null : this.session?.view ?? null, this.progress.completed, this.progress.sound);
+    this.shell.render(this.menu ? null : this.session?.view ?? null, this.progress.completed, this.progress.sound, this.scene.isIntroducing);
   }
 
   private readonly onVisibility = (): void => {
@@ -194,9 +202,12 @@ export class GameApp {
     const elapsed = this.previousTime ? Math.min((time - this.previousTime) / 1000, 0.1) : 0;
     this.previousTime = time;
     if (this.session && !this.loading) {
+      if (!this.menu && this.session.view.phase !== 'paused') {
+        for (const _id of this.scene.advanceCoinArrival(elapsed)) this.sound.play('land', 0.6);
+      }
       this.session.tick(elapsed);
       for (const feedback of new Set(this.session.drainFeedback())) {
-        if (!this.menu) this.sound.play(feedback);
+        if (!this.menu) this.sound.play(feedback, this.impactIntensity);
       }
       const view = this.session.view;
       if (!this.menu) {
@@ -213,7 +224,7 @@ export class GameApp {
           this.shell.setNotice(this.save.lastError);
         }
         this.previousView = view;
-        this.shell.render(view, this.progress.completed, this.progress.sound);
+        this.shell.render(view, this.progress.completed, this.progress.sound, this.scene.isIntroducing);
       }
       // The charge is presentation state: hold duration drives both the finger pose and the shot power.
       const charge = this.menu || this.loading ? null : this.pointer.charge();
@@ -226,12 +237,14 @@ export class GameApp {
       if (!this.menu && view.phase === 'simulating' && this.lastFrame && elapsed > 0) {
         for (const coin of frame.coins) {
           const previous = this.lastFrame.coins.find((item) => item.id === coin.id);
-          if (!previous || coin.position.y > 0.05) continue;
+          if (!previous || coin.position.y < -0.002 || coin.position.y > COIN_THICKNESS / 2 + 0.008
+            || !tableContainsPoint(frame.table, coin.position.x, coin.position.z)) continue;
           const speed = Math.hypot(coin.position.x - previous.position.x, coin.position.z - previous.position.z) / elapsed;
           if (speed > 0.05) slide = Math.max(slide, Math.min(1, speed / 1.5));
         }
       }
       this.lastFrame = frame;
+      if (view.phase === 'simulating') this.impactIntensity = Math.max(0.12, slide);
       this.sound.slide(this.menu ? 0 : slide);
       this.scene.render(frame, this.menu ? null : view, this.aim);
     }

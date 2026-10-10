@@ -113,12 +113,12 @@ export class Shell {
   private node<T extends HTMLElement = HTMLElement>(name: string): T { return this.elements.get(name)! as T; }
   private text(name: string, value: string): void { const node = this.node(name); if (node.textContent !== value) node.textContent = value; }
 
-  render(view: GameView | null, completed: string[], sound: boolean): void {
+  render(view: GameView | null, completed: string[], sound: boolean, introducing = false): void {
     this.view = view;
     this.completed = completed;
     const screen = view ? 'game' : this.menuPage;
     this.element.dataset.screen = screen;
-    this.element.dataset.phase = view?.phase ?? 'menu';
+    this.element.dataset.phase = introducing && view?.phase === 'selecting' ? 'introducing' : view?.phase ?? 'menu';
     this.node('home').hidden = screen !== 'home';
     this.node('levels').hidden = screen !== 'levels';
     this.node('hud').hidden = !view;
@@ -160,7 +160,11 @@ export class Shell {
       let title = '旋转视角，准备弹射';
       let description = '空白处拖动旋转视角；点选硬币开始';
       let turn = battle ? `玩家${view.currentPlayer === 0 ? '一' : '二'}的回合` : '轮到你了';
-      if (view.phase === 'selecting') {
+      if (introducing && view.phase === 'selecting') {
+        title = '硬币轻落桌面';
+        description = '稍等片刻，落稳后点选一枚开始';
+        turn = '正在摆桌';
+      } else if (view.phase === 'selecting') {
         title = '点选一枚硬币直接开始';
         description = '点中的硬币立即成为当前币；旋转空白区域可改变视角';
       } else if (view.phase === 'ready') {
@@ -178,7 +182,7 @@ export class Shell {
       this.text('turn-label', turn);
       this.text('prompt-title', title);
       this.text('prompt-description', description);
-      const announcement = `${view.sessionId}:${view.phase}:${view.currentPlayer}:${view.canSelectCoin}:${view.foulReasons.join(',')}`;
+      const announcement = `${view.sessionId}:${view.phase}:${introducing}:${view.currentPlayer}:${view.canSelectCoin}:${view.foulReasons.join(',')}`;
       if (announcement !== this.announced) { this.announced = announcement; this.text('live', `${turn}。${title}。${description}`); }
     }
     this.updateLayers();
