@@ -1,0 +1,25 @@
+{
+  "name": "flickchain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "validate:levels": "vitest run tests/levels"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "happy-dom": "20.14.6",
+    "typescript": "~5.9.3",
+    "vite": "^6.4.1",
+    "vitest": "4.1.11"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "first-flick",
+  "name": "01 · 初次接力",
+  "lesson": "先旋转视角，点击任意硬币并确认；再沿当前视角前方弹射。等停稳后，控制权会接到目标币。",
+  "table": { "width": 1.2, "depth": 1.6, "materialId": "wood" },
+  "coins": [
+    { "id": "a", "x": -0.2, "z": 0.1, "materialId": "standard" },
+    { "id": "b", "x": 0.15, "z": 0.1, "materialId": "standard" }
+  ],
+  "activeCoinId": "a",
+  "obstacles": []
+}
