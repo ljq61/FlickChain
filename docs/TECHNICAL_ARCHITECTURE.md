@@ -83,7 +83,11 @@ tests/                          纯规则、生产物理回归、生命周期测
 
 采用右手世界坐标：桌面为 XZ 平面，Y 向上。内部统一 SI：长度 m、时间 s、质量 kg、线速度 m/s、角速度 rad/s、冲量 kg·m/s。美术可用缩放后的视觉尺寸，但输入、判定与 Rapier 只使用世界单位。硬币半径、厚度、质量、重心、桌面尺寸及重力放入版本化配置，禁止散落在渲染或 AI 中。
 
-呈现层使用 `THREE.PerspectiveCamera` 的 3D 透视视角。空白桌面上的 Pointer 拖动改变相机 yaw/pitch；相机当前 forward 投影到 XZ 平面，作为唯一的弹射方向来源，保证“弹出去始终是当前视角前方”。起手和每次换人先进入 `selecting`：点击任意仍在桌上的公共硬币，镜头平滑跟随该币并显示选中标识；点击确认后才进入 `ready`，此时只能拖动当前币蓄力，松手沿相机前方发射。屏幕像素只映射力度，不再把拖拽向量当作世界方向，UI 以归一化力度 `power01` 展示。固定发射模型不增加自由打击高度或偏心旋转控制；拖动死区、最大拉距、相机灵敏度与最大冲量仍需设备调校。
+握拳手来自 Blender MCP 制作的 `public/models/flick-hand.glb`，可编辑源为 `assets/flick-hand.blend`。皮肤为一个封闭连通的 `hand_skin`，包括拳体、食指、拇指与腕部；根部权重混合到 `hand_root`，食指11段辅助骨骼分摊弧度，避免三处大角度蒙皮折叠。GameApp 在创建会话前等待 SceneManager 加载模型；加载失败保留请求参数供错误按钮重试。FlickFinger 用 AnimationMixer 按蓄力采样1秒 `FlickCharge`，拳体固定；高蓄力抖动只作用于外层节点。输入点来自骨骼标记和真实蒙皮表面，CPU查询使用与渲染相同的 `updateMatrixWorld` 更新绑定逆矩阵。销毁中止下载并释放迟到解析结果。该资产仅影响呈现与点击，不进入物理世界。
+
+桌面契约支持 `shape: 'circle' | 'rectangle'`，省略时兼容旧矩形数据；圆桌宽深相等，表示直径。`TableGeometry` 提供形状一致的内侧距离与点包含判断，物理支撑/边缘解锁、关卡校验、渲染标识和输入共用。圆桌使用 Rapier 圆柱碰撞体，上表面Y=0；渲染使用圆柱，默认五关直径1.6米，并重新生成生产解法回放与指纹。
+
+呈现层使用 `THREE.PerspectiveCamera` 的 3D 透视视角。空白桌面上的 Pointer 拖动改变相机 yaw/pitch；相机当前 forward 投影到 XZ 平面，作为唯一的弹射方向来源，保证“弹出去始终是当前视角前方”。起手和每次换人先进入 `selecting`：点击任意仍在桌上的公共硬币立即进入 `ready`，镜头平滑跟随，不需二次确认；首杆发射前 `canSelectCoin` 为 true，可反复换起手币。发射后关闭该许可，合法接力锁定刚击中的币。手指沿发射方向放在当前币正后方，待机平行桌面，按住手指或当前币时逐渐弯曲指节；`power01` 由按住时长决定，松手沿相机前方发射，不由拖拽距离决定。输入使用实际关节世界坐标构建手指命中区，硬币点击优先。固定发射模型不增加自由打击高度或偏心旋转控制；起发时长阈值、满蓄时长、相机灵敏度与最大冲量仍需设备调校。
 
 无效输入必须在调用物理前拒绝：NaN／Infinity、零方向、超范围力度、未知／已删除 coinId、错误玩家、错误 sessionId／stateRevision、未获发射权限、第二根指针。有限且合法的力度可按约定限幅；结构错误不静默修正。`pointercancel`、失焦、切模式、暂停、重开和视口变化取消未释放的手势，不产生一杆。开始 AI 请求时也取消人类手势。
 
@@ -235,16 +239,16 @@ Challenge 的失败提示可以在物理仍推进时出现，但“重试”只�
 ```mermaid
 stateDiagram-v2
     [*] --> LOADING
-    LOADING --> READY: 数据与世界就绪，固定初始主控币
+    LOADING --> SELECTING: 数据与世界就绪，开放起手选币
     SELECTING --> READY: 合法主控币已选
+    READY --> READY: canSelectCoin 时可重新选择起手币
     READY --> SIMULATING: 合法人类发射
     READY --> AI_THINKING: AI 回合
     AI_THINKING --> SIMULATING: 当前版本的合法结果
     SIMULATING --> RESOLVING: 全场静止或超时冻结
-    RESOLVING --> READY: 成功接管 B，未终局
+    RESOLVING --> READY: 成功接管 B，未终局，禁止重新选币
     RESOLVING --> TURN_TRANSITION: Battle 失败，未终局
-    TURN_TRANSITION --> READY: A 仍在桌面，交给下家
-    TURN_TRANSITION --> SELECTING: A 已掉落且剩余至少两币
+    TURN_TRANSITION --> SELECTING: 剩余至少两币，下一玩家自由选择起手
     RESOLVING --> CHALLENGE_FAILED: Challenge 犯规
     RESOLVING --> ROUND_OVER: 合法目标完成或 Battle 终局
     CHALLENGE_FAILED --> LOADING: 重试新 session
@@ -261,7 +265,7 @@ stateDiagram-v2
 
 ### 6.2 本地 Battle：Last Coin 建议默认
 
-两名玩家共用所有硬币；选币只是主控指定，不创建所有权。起手与每次失败换人都进入 `SELECTING`，由当前玩家从仍在桌上的公共币中选择并确认。合法 SUCCESS 得一分并继续；失败后将选择权交给下家。失败未掉落的 A 仍保留在真实位置，仍可被下一玩家重新选中；A 已掉落时只能从剩余币中选择。
+两名玩家共用所有硬币；选币只是主控指定，不创建所有权。起手与每次失败换人都进入 `SELECTING`，由当前玩家从仍在桌上的公共币中点选，首杆发射前可反复切换。`GameView.canSelectCoin` 初始与换人后为 true，仅成功接受发射后变 false；实际选币同时验证 phase 为 selecting/ready，暂停与终局拒绝。合法 SUCCESS 得一分并继续，主控固定为目标 B；失败后将选择权交给下家。失败未掉落的 A 仍保留在真实位置，仍可被下一玩家重新选中；A 已掉落时只能从剩余币中选择。
 
 人机模式进入 SELECTING 时，由当前玩家 owner 决定选择来源：人类显示剩余公共币选择 UI；AIController 按有限预算的选币策略选择有效剩余 coinId，并通过同样的 sessionId／revision／playerId 校验提交选币命令。不得等待人类替 AI 选币。选币不移动币，成功提交后到 READY，再发起 AI_THINKING 搜索；选币结果过期或取消时丢弃，失败时采用明确的合法回退选择。人类在 AI 选择阶段仍无操作权。
 

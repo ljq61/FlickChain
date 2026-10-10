@@ -1,6 +1,7 @@
 import { COIN_RADIUS } from '../physics/MaterialRegistry';
+import { tableContainsPoint } from '../physics/TableGeometry';
 import type { SceneManager } from '../rendering/SceneManager';
-import type { AimPreview, Direction, GameView, Vec3, WorldFrame } from '../types/contracts';
+import type { Direction, GameView, Vec3, WorldFrame } from '../types/contracts';
 
 const SELECT_CANCEL_DISTANCE = 12;
 const MIN_HIT_RADIUS = 22;
@@ -100,14 +101,14 @@ export class PointerInput {
     if (!view || !frame || (view.phase !== 'ready' && view.phase !== 'selecting')) return;
     const coin = this.findCoin(view, frame, event.clientX, event.clientY);
     event.preventDefault();
-    if (coin && (view.phase === 'selecting' || coin.id !== view.activeCoinId)) {
-      // Tapping a coin starts the run; while ready and unshot, tapping another coin switches the launch coin.
+    if (coin && view.canSelectCoin && (view.phase === 'selecting' || coin.id !== view.activeCoinId)) {
+      // Before this turn's first shot, another public coin can replace the launch choice.
       this.gesture = {
         kind: 'select', pointerId: event.pointerId, sessionId: view.sessionId, revision: view.revision,
         phase: view.phase, player: view.currentPlayer, coinId: coin.id,
         clientStart: { x: event.clientX, y: event.clientY },
       };
-    } else if (coin && view.phase === 'ready') {
+    } else if (coin) {
       this.gesture = {
         kind: 'shot', pointerId: event.pointerId, sessionId: view.sessionId, revision: view.revision,
         phase: view.phase, player: view.currentPlayer, coinId: coin.id, source: { ...coin.position },
@@ -126,9 +127,8 @@ export class PointerInput {
   private findCoin(view: GameView, frame: WorldFrame, clientX: number, clientY: number) {
     const candidates = frame.coins.filter((coin) => {
       const position = coin.position;
-      return position.y >= -0.004 && Math.abs(position.x) <= frame.table.width / 2 && Math.abs(position.z) <= frame.table.depth / 2;
+      return position.y >= -0.004 && tableContainsPoint(frame.table, position.x, position.z);
     });
-    const direction = view.phase === 'ready' ? this.scene.getAimDirection() : null;
     let nearest: typeof candidates[number] | undefined;
     let nearestDistance = Infinity;
     for (const coin of candidates) {
@@ -137,18 +137,15 @@ export class PointerInput {
       const hitRadius = Math.max(MIN_HIT_RADIUS, Math.abs(edge.x - center.x) * 1.4);
       const distance = Math.hypot(center.x - clientX, center.y - clientY);
       if (distance <= hitRadius && distance < nearestDistance) { nearest = coin; nearestDistance = distance; }
-      if (direction && coin.id === view.activeCoinId) {
-        // The flick finger lies flat behind the active coin; pressing it (or the coin) charges the shot.
-        for (const anchor of [
-          { x: coin.position.x - direction.x * 0.09, y: coin.position.y + 0.014, z: coin.position.z - direction.z * 0.09 },
-          { x: coin.position.x - direction.x * 0.14, y: coin.position.y + 0.014, z: coin.position.z - direction.z * 0.14 },
-        ]) {
-          const point = this.scene.projectToScreen(anchor);
-          const anchorDistance = Math.hypot(point.x - clientX, point.y - clientY);
-          if (anchorDistance <= Math.max(FINGER_HIT_RADIUS, hitRadius * 1.6) && anchorDistance < nearestDistance) { nearest = coin; nearestDistance = anchorDistance; }
-        }
-      }
     }
+    // Every visible coin blocks the finger hit area, even when relay rules make it unselectable.
+    if (nearest) return view.phase === 'ready' && !view.canSelectCoin && nearest.id !== view.activeCoinId ? undefined : nearest;
+    if (view.phase !== 'ready') return undefined;
+    const active = candidates.find((coin) => coin.id === view.activeCoinId);
+    if (active && this.scene.getFingerHitPoints().some((anchor) => {
+      const point = this.scene.projectToScreen(anchor);
+      return Math.hypot(point.x - clientX, point.y - clientY) <= FINGER_HIT_RADIUS;
+    })) return active;
     return nearest;
   }
 

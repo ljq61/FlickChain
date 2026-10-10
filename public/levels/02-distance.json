@@ -3,7 +3,7 @@
   "id": "distance",
   "name": "02 · 远近有度",
   "lesson": "拖得更远，力度更大。碰到目标即可，留意桌边。",
-  "table": { "width": 1.2, "depth": 1.6, "materialId": "wood" },
+  "table": { "shape": "circle", "width": 1.6, "depth": 1.6, "materialId": "wood" },
   "coins": [
     { "id": "a", "x": 0, "z": 0.32, "materialId": "standard" },
     { "id": "b", "x": 0, "z": -0.28, "materialId": "standard" }

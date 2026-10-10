@@ -3,7 +3,7 @@
   "id": "zigzag",
   "name": "04 · 曲折有路",
   "lesson": "轻轻接力，给下一杆留下空间。目标被推出桌边也会失败。",
-  "table": { "width": 1.2, "depth": 1.6, "materialId": "wood" },
+  "table": { "shape": "circle", "width": 1.6, "depth": 1.6, "materialId": "wood" },
   "coins": [
     { "id": "a", "x": -0.3, "z": 0.43, "materialId": "standard" },
     { "id": "b", "x": 0.17, "z": 0.2, "materialId": "standard" },

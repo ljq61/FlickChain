@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { COIN_RADIUS, COIN_THICKNESS, PHYSICS_CONFIG } from '../physics/MaterialRegistry';
+import { tableContainsPoint } from '../physics/TableGeometry';
 import type { AimPreview, GameView, LevelConfig, Vec3, WorldFrame } from '../types/contracts';
+import { FlickFinger } from './FlickFinger';
 
 const TABLE_THICKNESS = PHYSICS_CONFIG.tableThickness;
-const SELECT_COLOR = 0x2b6457;
 const GLOW_COLOR = 0xff9d42;
 
 function woodTexture(): THREE.CanvasTexture {
@@ -99,22 +100,16 @@ export class SceneManager {
   private readonly stampGeometry = new THREE.TorusGeometry(COIN_RADIUS * 0.57, COIN_RADIUS * 0.014, 5, 48);
   private readonly shadowGeometry = new THREE.PlaneGeometry(COIN_RADIUS * 3.7, COIN_RADIUS * 3.7);
   private readonly glowLight = new THREE.PointLight(GLOW_COLOR, 0, 0.45, 2);
-  private readonly aimGroup = new THREE.Group();
-  private readonly aimMaterial = new THREE.MeshBasicMaterial({ color: SELECT_COLOR, depthTest: false });
-  private readonly aimShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.0022, 0.0022, 1, 8), this.aimMaterial);
-  private readonly aimHead = new THREE.Mesh(new THREE.ConeGeometry(0.009, 0.025, 12), this.aimMaterial);
-  private readonly fingerGroup = new THREE.Group();
-  private readonly fingerBase = new THREE.Group();
-  private readonly fingerKnuckle = new THREE.Group();
-  private readonly skinMaterial = new THREE.MeshStandardMaterial({ color: 0xc08460, roughness: 0.62, envMapIntensity: 0.35 });
-  private readonly nailMaterial = new THREE.MeshStandardMaterial({ color: 0xdfb598, roughness: 0.45, envMapIntensity: 0.35 });
+  private readonly finger = new FlickFinger();
   private readonly observer: ResizeObserver;
   private readonly cameraFocus = new THREE.Vector3();
   private readonly desiredFocus = new THREE.Vector3();
-  private table = { width: 1.1, depth: 1.4 };
+  private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  private table: LevelConfig['table'] = { width: 1.6, depth: 1.6, shape: 'circle', materialId: 'wood' };
   private focusId: string | null = null;
   private orbitYaw = 0;
-  private orbitPitch = 0.92;
+  private orbitPitch = 0.75;
+  private overviewDistance = 2.4;
   private orbitDistance = 2.4;
   private cameraReady = false;
   private disposed = false;
@@ -159,33 +154,8 @@ export class SceneManager {
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.13;
     floor.receiveShadow = true;
-    this.scene.add(floor, this.tableGroup, this.aimGroup, this.glowLight);
-    this.aimGroup.add(this.aimShaft, this.aimHead);
-    this.aimGroup.visible = false;
-    this.aimGroup.renderOrder = 5;
-    // A stylized index finger lies flat on the table behind the active coin, fingertip at its back
-    // edge; charging cocks it back and up so the power reads from any camera angle.
-    this.scene.add(this.fingerGroup);
-    this.fingerGroup.visible = false;
-    this.fingerGroup.add(this.fingerBase);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.02, 20, 14), this.skinMaterial);
-    hand.scale.set(1.1, 0.55, 1.4);
-    hand.position.set(0, 0.014, -0.012);
-    hand.castShadow = true;
-    const proximal = new THREE.Mesh(new THREE.CapsuleGeometry(0.0145, 0.058, 6, 12), this.skinMaterial);
-    proximal.rotation.x = Math.PI / 2;
-    proximal.position.set(0, 0.012, 0.0435);
-    proximal.castShadow = true;
-    this.fingerBase.add(hand, proximal, this.fingerKnuckle);
-    this.fingerKnuckle.position.set(0, 0.012, 0.087);
-    const distal = new THREE.Mesh(new THREE.CapsuleGeometry(0.0115, 0.028, 6, 12), this.skinMaterial);
-    distal.rotation.x = Math.PI / 2;
-    distal.position.set(0, 0, 0.0185);
-    distal.castShadow = true;
-    const nail = new THREE.Mesh(new THREE.SphereGeometry(0.009, 16, 12), this.nailMaterial);
-    nail.scale.set(1, 0.4, 1.2);
-    nail.position.set(0, 0.0125, 0.028);
-    this.fingerKnuckle.add(distal, nail);
+    this.scene.add(floor, this.tableGroup, this.glowLight);
+    this.scene.add(this.finger);
     this.setLevel({ schemaVersion: 1, id: 'preview', name: '', lesson: '', table: { ...this.table, materialId: 'wood' }, coins: [], activeCoinId: '', obstacles: [] });
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(host);
@@ -211,6 +181,17 @@ export class SceneManager {
     return { x: forward.x, z: forward.z };
   }
 
+  /** Finish rig loading before enabling gameplay input. Reuses the loaded asset. */
+  initializeHand(): Promise<void> { return this.finger.load(); }
+
+  /** Finger and shot share one axis: the finger always starts directly behind the coin. */
+  getFingerDirection(): { x: number; z: number } {
+    return this.getAimDirection();
+  }
+
+  /** Actual articulated finger points, shared with input instead of guessed screen offsets. */
+  getFingerHitPoints(): Vec3[] { return this.finger.getHitPoints(); }
+
   focusCoin(id: string | null): void { this.focusId = id; }
   clearFocus(): void { this.focusId = null; }
 
@@ -224,7 +205,9 @@ export class SceneManager {
       this.tableGroup.remove(child);
       child.traverse((object) => { if (object instanceof THREE.Mesh) object.geometry.dispose(); });
     }
-    const board = new THREE.Mesh(new THREE.BoxGeometry(level.table.width, TABLE_THICKNESS, level.table.depth), [this.edgeMaterial, this.edgeMaterial, this.woodMaterial, this.edgeMaterial, this.edgeMaterial, this.edgeMaterial]);
+    const board = level.table.shape === 'circle'
+      ? new THREE.Mesh(new THREE.CylinderGeometry(level.table.width / 2, level.table.width / 2, TABLE_THICKNESS, 128), [this.edgeMaterial, this.woodMaterial, this.edgeMaterial])
+      : new THREE.Mesh(new THREE.BoxGeometry(level.table.width, TABLE_THICKNESS, level.table.depth), [this.edgeMaterial, this.edgeMaterial, this.woodMaterial, this.edgeMaterial, this.edgeMaterial, this.edgeMaterial]);
     board.position.y = -TABLE_THICKNESS / 2;
     board.receiveShadow = true;
     board.castShadow = true;
@@ -269,6 +252,10 @@ export class SceneManager {
     const requestedFocus = requestedFocusId ? frame.coins.find((coin) => coin.id === requestedFocusId) : undefined;
     this.desiredFocus.set(requestedFocus?.position.x ?? 0, 0, requestedFocus?.position.z ?? 0);
     this.cameraFocus.lerp(this.desiredFocus, this.cameraReady ? 0.14 : 1);
+    // Selection retains enough context to choose a launch coin; aiming becomes a close tabletop view.
+    const distance = requestedFocus && view ? Math.max(0.9, this.overviewDistance * 0.46)
+      : view ? this.overviewDistance * 0.82 : this.overviewDistance;
+    this.orbitDistance = THREE.MathUtils.lerp(this.orbitDistance, distance, this.cameraReady ? 0.12 : 1);
     this.updateCamera();
     const visibleIds = new Set(frame.coins.map((coin) => coin.id));
     for (const [id, mesh] of this.coinMeshes) {
@@ -302,7 +289,7 @@ export class SceneManager {
       }
       mesh.position.set(transform.position.x, transform.position.y, transform.position.z);
       mesh.quaternion.set(transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
-      const onTable = transform.position.y >= -0.004 && transform.position.y < 0.07 && Math.abs(transform.position.x) <= frame.table.width / 2 && Math.abs(transform.position.z) <= frame.table.depth / 2;
+      const onTable = transform.position.y >= -0.004 && transform.position.y < 0.07 && tableContainsPoint(frame.table, transform.position.x, transform.position.z);
       const shadow = this.coinShadows.get(transform.id)!;
       shadow.position.set(transform.position.x, 0.0005, transform.position.z);
       shadow.visible = onTable;
@@ -323,34 +310,10 @@ export class SceneManager {
     } else {
       this.glowLight.intensity = 0;
     }
-    this.fingerGroup.visible = ready && activeOnTable;
-    if (this.fingerGroup.visible) {
-      const power = aim?.power ?? 0;
-      const forward = this.getAimDirection();
-      const moment = performance.now() * 0.001;
-      const tremble = power * power * 0.12;
-      this.fingerGroup.position.set(
-        activeX - forward.x * 0.158 + Math.sin(moment * 61) * tremble * 0.003,
-        0.002,
-        activeZ - forward.z * 0.158 + Math.cos(moment * 53) * tremble * 0.003,
-      );
-      this.fingerGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(forward.x, 0, forward.z));
-      // Idle: lying flat, fingertip at the coin's back edge. Charging: cocking back and up.
-      this.fingerBase.rotation.x = -power * 0.45 + Math.sin(moment * 47) * tremble * 0.6;
-      this.fingerKnuckle.rotation.x = -(0.04 + power * 0.9) + Math.sin(moment * 43) * tremble;
-      this.fingerKnuckle.rotation.z = Math.sin(moment * 57 + 1.3) * tremble * 0.7;
-    }
-    this.aimGroup.visible = ready && !!aim;
-    if (aim && ready) {
-      const direction = new THREE.Vector3(aim.direction.x, 0, aim.direction.z).normalize();
-      const source = new THREE.Vector3(aim.source.x, Math.max(0.012, aim.source.y + 0.009), aim.source.z);
-      const length = 0.11 + aim.power * 0.19;
-      const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-      this.aimShaft.quaternion.copy(rotation);
-      this.aimShaft.scale.y = length - 0.018;
-      this.aimShaft.position.copy(source).addScaledVector(direction, (length - 0.018) / 2 + COIN_RADIUS * 1.3);
-      this.aimHead.quaternion.copy(rotation);
-      this.aimHead.position.copy(source).addScaledVector(direction, length + COIN_RADIUS * 1.3);
+    this.finger.visible = ready && activeOnTable;
+    if (this.finger.visible) {
+      this.finger.setPose({ x: activeX, z: activeZ }, this.getFingerDirection(), aim?.power ?? 0,
+        this.reducedMotion.matches ? 0 : performance.now() / 1000);
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -376,7 +339,8 @@ export class SceneManager {
     const aspect = width / height;
     this.camera.aspect = aspect;
     this.camera.fov = 42;
-    this.orbitDistance = Math.max(1.9, this.table.depth * 1.32, this.table.width / Math.max(0.55, aspect) * 0.95);
+    this.overviewDistance = Math.max(1.9, this.table.depth * 1.32, this.table.width / Math.max(0.55, aspect) * 0.95);
+    if (!this.cameraReady) this.orbitDistance = this.overviewDistance;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
     this.updateCamera();
@@ -400,6 +364,8 @@ export class SceneManager {
     if (this.disposed) return;
     this.disposed = true;
     this.observer.disconnect();
+    this.scene.remove(this.finger);
+    this.finger.dispose();
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();
     this.scene.traverse((object) => {

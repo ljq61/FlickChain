@@ -18,12 +18,19 @@ export interface ObstacleConfig {
   depth: number;
   rotation?: number;
 }
+export interface TableConfig {
+  width: number;
+  depth: number;
+  materialId: 'wood';
+  /** Missing shape preserves legacy rectangular content. Circle uses width=depth=diameter. */
+  shape?: 'rectangle' | 'circle';
+}
 export interface LevelConfig {
   schemaVersion: 1;
   id: string;
   name: string;
   lesson: string;
-  table: { width: number; depth: number; materialId: 'wood' };
+  table: TableConfig;
   coins: CoinConfig[];
   activeCoinId: string;
   obstacles: ObstacleConfig[];
@@ -56,6 +63,8 @@ export interface GameView {
   phase: GamePhase;
   levelId: string;
   activeCoinId: string | null;
+  /** Public launch choice remains open until the first shot of this player's turn. */
+  canSelectCoin: boolean;
   currentPlayer: 0 | 1;
   scores: [number, number];
   remaining: number;

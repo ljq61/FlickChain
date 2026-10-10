@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { validateLevel } from '../content/LevelValidator';
 import type { Direction, LevelConfig, WorldFrame } from '../types/contracts';
 import { COIN_RADIUS, COIN_THICKNESS, MATERIALS, PHYSICS_CONFIG, impulseForPower } from './MaterialRegistry';
+import { tableClearance } from './TableGeometry';
 
 let initialization: Promise<void> | undefined;
 interface CoinBinding {
@@ -28,7 +29,10 @@ export class PhysicsWorld {
     this.world.timestep = PHYSICS_CONFIG.fixedDt;
     this.world.numSolverIterations = PHYSICS_CONFIG.solverIterations;
     this.events = new RAPIER.EventQueue(true);
-    this.tableCollider = this.world.createCollider(RAPIER.ColliderDesc.cuboid(level.table.width / 2, PHYSICS_CONFIG.tableThickness / 2, level.table.depth / 2)
+    const tableDesc = level.table.shape === 'circle'
+      ? RAPIER.ColliderDesc.cylinder(PHYSICS_CONFIG.tableThickness / 2, level.table.width / 2)
+      : RAPIER.ColliderDesc.cuboid(level.table.width / 2, PHYSICS_CONFIG.tableThickness / 2, level.table.depth / 2);
+    this.tableCollider = this.world.createCollider(tableDesc
       .setTranslation(0, -PHYSICS_CONFIG.tableThickness / 2, 0).setFriction(MATERIALS.wood.friction).setRestitution(MATERIALS.wood.restitution));
     for (const obstacle of level.obstacles) {
       const angle = obstacle.rotation ?? 0;
@@ -107,7 +111,7 @@ export class PhysicsWorld {
       if (![position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, rotation.w].every(Number.isFinite)) throw new Error('物理世界出现非有限位姿');
       if (position.y < PHYSICS_CONFIG.fallY && !this.fallen.has(id)) { this.fallen.add(id); fallenCoinIds.push(id); }
       const onTable = this.supported(coin);
-      const edge = Math.abs(position.x) > this.level.table.width / 2 - COIN_RADIUS * PHYSICS_CONFIG.edgeUnlockRadiusFraction || Math.abs(position.z) > this.level.table.depth / 2 - COIN_RADIUS * PHYSICS_CONFIG.edgeUnlockRadiusFraction;
+      const edge = tableClearance(this.level.table, position.x, position.z) < COIN_RADIUS * PHYSICS_CONFIG.edgeUnlockRadiusFraction;
       if ((!onTable || edge) && !coin.free) {
         coin.free = true; coin.supportSteps = 0;
         coin.body.setEnabledRotations(true, true, true, true);
@@ -124,7 +128,7 @@ export class PhysicsWorld {
   private supported(coin: CoinBinding): boolean {
     if (this.disposed) return false;
     const p = coin.body.translation();
-    if (Math.abs(p.x) >= this.level.table.width / 2 || Math.abs(p.z) >= this.level.table.depth / 2 || p.y < PHYSICS_CONFIG.minSupportedCenterY || p.y > COIN_RADIUS + PHYSICS_CONFIG.supportTolerance) return false;
+    if (tableClearance(this.level.table, p.x, p.z) <= 0 || p.y < PHYSICS_CONFIG.minSupportedCenterY || p.y > COIN_RADIUS + PHYSICS_CONFIG.supportTolerance) return false;
     let contact = false;
     this.world.contactPair(coin.collider, this.tableCollider, (manifold) => {
       // Table-top contact, including a naturally tilted coin; side contacts are not support.

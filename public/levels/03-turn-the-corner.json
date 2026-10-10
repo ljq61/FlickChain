@@ -3,7 +3,7 @@
   "id": "turn-the-corner",
   "name": "03 · 转角接棒",
   "lesson": "每杆只碰一枚币；从目标停下的位置，调整方向继续。",
-  "table": { "width": 1.2, "depth": 1.6, "materialId": "wood" },
+  "table": { "shape": "circle", "width": 1.6, "depth": 1.6, "materialId": "wood" },
   "coins": [
     { "id": "a", "x": -0.3, "z": 0.28, "materialId": "standard" },
     { "id": "b", "x": 0.12, "z": 0.12, "materialId": "standard" },

@@ -1,8 +1,18 @@
 # FlickChain 任务计划 V0.2
 
-日期：2026-10-09｜feature：flickchain-web-3d｜模式：完整规划｜状态：active（首个可玩版本已实现，设备与阶段出口验收待完成）
+日期：2026-10-10｜feature：flickchain-web-3d｜模式：完整规划｜状态：active（5关/本地双人、连体手与圆桌已实现，设备与阶段出口验收待完成）
+
+当前进度以 [PROGRESS.md](PROGRESS.md) 为准；本文件保留完整阶段计划。最新版本84项测试与构建通过，五关圆桌完整解法回放、鼠标及模拟触摸已验证。Worker AI、20关、真机性能与发布仍未完成。
 
 2026-10-10 交互迭代完成：点币即时开始、弹射前可切换当前币、按住手指按时长蓄力、金币表现与金属感音效；单测与真 GPU 浏览器验证全绿，见 [交互 v2 验证记录](validation/2026-10-10-interaction-v2.md)。
+
+2026-10-10 后续修正：入关/换人后仅首杆发射前自由换币，合法接力锁定刚命中的币；手指待机沿发射方向位于金币正后方、平行桌面，按住逐渐弯曲。交互 v2 是历史验证记录，其“每杆发射前均可换币”不再作为当前规则。
+
+同日表现补充：完整卡通握拳手、食指蓄力弯曲与高蓄力微抖，选币后平滑推近镜头；选币、接力与物理参数沿用前述规则。
+
+同日模型迭代：按用户参考图通过 Blender MCP 制作 low poly 握拳手，绑定食指三节骨骼及 `FlickCharge`，已用真实 GLB 替换程序化手。76项测试、构建、鼠标和模拟触摸通过，见 [骨骼手验收](validation/2026-10-10-rigged-hand.md)。
+
+同日后续修正：用户要求消除手部破损，食指与拳头一体，默认圆桌。已重做连续皮肤网格与食指辅助骨骼，并同步圆形渲染、输入、物理与关卡边界；本轮验收见 [连体手与圆桌记录](validation/2026-10-10-continuous-hand-round-table.md)。
 
 ## 1. 任务契约
 
@@ -52,7 +62,7 @@ T01–T03、T05–T11 已实现；T04/T12 部分验证，真实设备、性能�
 |---|---|---|---|
 | T01 工程与共享契约 | 主协调者；`package.json`、锁文件、`tsconfig.json`、`vite.config.ts`、`index.html`、`src/types/contracts.ts`、`src/app/bootstrap.ts` | 决策 D-01/06/07 → 选择并锁定依赖、定义 CoinId/ShotCommand/WorldState/ShotResult/LevelConfig → 可启动工程与类型检查；不接平台服务 | 无；AC01/TST01；回查导入/初始化/资源基址 |
 | T02 权威物理世界 | 物理；`src/physics/PhysicsWorld.ts`、`PhysicsStepper.ts`、`MaterialRegistry.ts`、`CollisionCollector.ts` | 统一单位及物理配置 → 木桌、圆柱币、障碍、重力、CCD、映射、固定步 → 无渲染模拟世界；质量实际参与动量 | T01；AC01/TST02；回查单位、质量重复叠加、CCD、step配置 |
-| T03 呈现与瞄准 | 表现；`src/rendering/SceneManager.ts`、`src/input/PointerInput.ts`、`src/ui/` | 权威世界 → 透视相机轨道、空白拖动旋转、选币聚焦/确认、当前币归一力度与视角前方命令 → 鼠标/触摸候选命令；不得拖动币位置或修改规则 | T01/T02；AC02/TST03；回查坐标投射、camera锁、选币确认、pointer capture |
+| T03 呈现与瞄准 | 表现；`src/rendering/SceneManager.ts`、`src/rendering/FlickFinger.ts`、`src/input/PointerInput.ts`、`src/ui/` | 权威世界 → 透视相机轨道、空白拖动旋转、点币即时聚焦、连体手按时长蓄力与视角前方命令 → 鼠标/触摸候选命令；不得拖动币位置或修改规则 | T01/T02；AC02/TST03；回查坐标投射、camera锁、接力锁币、pointer capture |
 | T04 物理手感集成 | 主协调者接线；`src/app/GameApp.ts`；物理负责 `tests/physics/`，表现负责交互记录 | 3/10/20币固定布局 → 验证轻/中/重力度、擦边、反弹、掉落及60/120Hz → 配置候选和性能记录 | T02/T03；AC01/02/TST02/03/10；回查物理积压与渲染耦合 |
 
 出口：不同力度有清晰差别、动量可传递、测试布局无穿透、桌面可操作，固定物理步与渲染帧率解耦。记录真实设备，不以桌面模拟触摸替代手机验收。
@@ -73,7 +83,7 @@ T01–T03、T05–T11 已实现；T04/T12 部分验证，真实设备、性能�
 |---|---|---|---|
 | T08 关卡数据入口 | 关卡；`src/content/LevelLoader.ts`、`LevelValidator.ts`、`public/levels/`、`tests/levels/` | 版本化JSON → 校验单位/ID/材质/主控/边界/重叠 → 5个木桌关；非法配置可返回重选 | T01/T06；AC06/TST07；回查schema、初始静止和配置hash |
 | T09 单人完整闭环 | 玩法；`src/modes/ChallengeMode.ts`；表现负责菜单/结果UI | CLEAR_ALL → 任意犯规失败、合法最后一杆通关 → 重试/下一关/返回；掉落减到1币不可通关 | T07/T08；AC07/TST06/07；回查犯规与目标优先级 |
-| T10 本地双人 | 玩法；`src/modes/BattleMode.ts`；表现负责比分/交接/选币UI | 数据指定 P1 先手；起手与每次犯规换人后都从剩余公共币中选币并确认 → 合法继续，≤1币按比分结束 → 胜负/平局；不回滚 | T07/T08；AC08/TST06；回查源币存活、选币门禁与终局优先级 |
+| T10 本地双人 | 玩法；`src/core/GameSession.ts`；表现负责比分/交接/选币UI | 数据指定 P1 先手；起手与犯规换人后点公共币即时选中，首杆前可换币；合法接力锁定目标 → ≤1币按比分结束 → 胜负/平局；不回滚 | T07/T08；AC08/TST06；回查源币存活、选币门禁与终局优先级 |
 | T11 教学、音效与存档 | 表现 `src/ui/` 音效；平台 `src/platform/SaveAdapter.ts`；主协调者接线 | 首次操作/成绩 → 教学、交互解锁音频、版本存档及损坏恢复 → 可恢复关卡进度、声音设置 | T09/T10；AC09/TST03/08；回查存档异常与音频许可 |
 | T12 MVP独立验收 | test-reviewer只读；主协调者运行需写检查并保存证据 | 当前实现及测试报告 → 回归核心链/菜单/返回/重复重试 → MVP验收报告与修复项 | T11；AC01–09/TST01–08；任何P0/P1阻断出口 |
 

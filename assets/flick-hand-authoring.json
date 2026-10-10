@@ -1,0 +1,87 @@
+{
+  "blender": "5.1.2",
+  "scene": "FlickChain_Hand_Studio",
+  "bones": [
+    "hand_root",
+    "index_mcp",
+    "index_curve_01",
+    "index_curve_02",
+    "index_curve_03",
+    "index_curve_04",
+    "index_pip",
+    "index_curve_06",
+    "index_curve_07",
+    "index_dip",
+    "index_curve_09",
+    "index_curve_10"
+  ],
+  "clip": "FlickCharge",
+  "frames": [
+    0,
+    24
+  ],
+  "topology": {
+    "components": 1,
+    "boundary_edges": 0,
+    "non_manifold_edges": 0,
+    "signed_volume": 0.000492836486487671
+  },
+  "pose_min_y": [
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167,
+    0.003147659357637167
+  ],
+  "meshes": {
+    "hand_skin": {
+      "vertices": 4073,
+      "faces": 6950
+    },
+    "knuckle_crease_0": {
+      "vertices": 18,
+      "faces": 8
+    },
+    "knuckle_crease_1": {
+      "vertices": 18,
+      "faces": 8
+    },
+    "knuckle_crease_2": {
+      "vertices": 18,
+      "faces": 8
+    },
+    "index_nail": {
+      "vertices": 48,
+      "faces": 38
+    },
+    "cuff": {
+      "vertices": 64,
+      "faces": 50
+    },
+    "sleeve": {
+      "vertices": 64,
+      "faces": 50
+    }
+  },
+  "glb_bytes": 264232
+}

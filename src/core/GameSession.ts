@@ -18,7 +18,7 @@ export class GameSession {
   private constructor(private readonly physics: PhysicsWorld, level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1) {
     this.state = {
       sessionId: `flickchain-${++sessionSequence}`, revision: 0, mode, phase: 'selecting', levelId: level.id,
-      activeCoinId: null, currentPlayer: firstPlayer, scores: [0, 0], remaining: level.coins.length,
+      activeCoinId: null, canSelectCoin: true, currentPlayer: firstPlayer, scores: [0, 0], remaining: level.coins.length,
       chain: 0, shotCount: 0, foulReasons: [], lastResult: null, winner: null, error: null,
     };
   }
@@ -40,13 +40,14 @@ export class GameSession {
     if (!this.physics.applyShot(this.state.activeCoinId, direction, power)) return false;
     this.facts = { sourceCoinId: this.state.activeCoinId, contacts: [], fallenCoinIds: [], timedOut: false };
     this.shotSteps = 0; this.quietSteps = 0; this.accumulator = 0; this.feedback = [];
-    this.state.phase = 'simulating'; this.state.shotCount++; this.state.revision++;
+    this.state.phase = 'simulating'; this.state.canSelectCoin = false; this.state.shotCount++; this.state.revision++;
     this.state.foulReasons = []; this.state.lastResult = null;
     return true;
   }
   selectCoin(id: string): boolean {
-    // Selecting starts the run; while ready and unshot, the launch coin can still be switched.
-    if (this.disposed || (this.state.phase !== 'selecting' && this.state.phase !== 'ready') || !this.physics.hasCoin(id)) return false;
+    // Entry and each new Battle turn allow re-picking until a valid shot is launched.
+    // A settled relay keeps the permission closed even though aiming returns to ready.
+    if (this.disposed || !this.state.canSelectCoin || (this.state.phase !== 'selecting' && this.state.phase !== 'ready') || !this.physics.hasCoin(id)) return false;
     this.state.activeCoinId = id; this.state.phase = 'ready'; this.state.revision++;
     return true;
   }
@@ -109,6 +110,7 @@ export class GameSession {
       else {
         this.state.currentPlayer = this.state.currentPlayer === 0 ? 1 : 0;
         this.state.activeCoinId = null;
+        this.state.canSelectCoin = true;
         this.state.phase = 'selecting';
       }
       if (!this.physics.hasCoin(facts.sourceCoinId)) this.state.activeCoinId = null;
@@ -130,6 +132,6 @@ export class GameSession {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true; this.facts = null; this.accumulator = 0; this.feedback = []; this.physics.dispose();
-    this.state.phase = 'error'; this.state.error = '会话已销毁'; this.state.activeCoinId = null; this.state.remaining = 0; this.state.revision++;
+    this.state.phase = 'error'; this.state.canSelectCoin = false; this.state.error = '会话已销毁'; this.state.activeCoinId = null; this.state.remaining = 0; this.state.revision++;
   }
 }

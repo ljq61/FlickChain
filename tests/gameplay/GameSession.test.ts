@@ -29,13 +29,22 @@ describe('production physics and session lifecycle', () => {
     expect(game.view).toMatchObject({ activeCoinId: 'A', phase: 'ready' });
     expect(game.frame.coins[0].position.x).toBeCloseTo(-0.18, 3);
   });
-  it('allows any public coin to be selected before the first shot', async () => {
-    const game = await GameSession.create(level(), 'challenge'); sessions.push(game);
-    expect(game.view).toMatchObject({ phase: 'selecting', activeCoinId: null });
+  it.each(['challenge', 'battle'] as const)('allows repeated public coin selection before the first %s shot', async (mode) => {
+    const game = await GameSession.create(level(), mode); sessions.push(game);
+    const board = game.frame;
+    expect(game.view).toMatchObject({ phase: 'selecting', activeCoinId: null, canSelectCoin: true });
+    const initial = game.view;
+    expect(game.selectCoin('missing')).toBe(false);
+    expect(game.view).toEqual(initial);
     expect(game.selectCoin('B')).toBe(true);
-    expect(game.view).toMatchObject({ phase: 'ready', activeCoinId: 'B' });
+    expect(game.view).toMatchObject({ phase: 'ready', activeCoinId: 'B', canSelectCoin: true });
     expect(game.selectCoin('A')).toBe(true);
-    expect(game.view).toMatchObject({ phase: 'ready', activeCoinId: 'A' });
+    expect(game.selectCoin('B')).toBe(true);
+    expect(game.view).toMatchObject({ phase: 'ready', activeCoinId: 'B', scores: [0, 0], shotCount: 0, revision: initial.revision + 3 });
+    expect(game.frame).toEqual(board);
+    expect(game.shoot({ x: -1, z: 0 }, 0.7)).toBe(true);
+    expect(game.view).toMatchObject({ phase: 'simulating', activeCoinId: 'B', canSelectCoin: false });
+    expect(game.selectCoin('A')).toBe(false);
   });
   it('does not score or delete at first contact; commits final relay once', async () => {
     const game = await session();
@@ -49,17 +58,36 @@ describe('production physics and session lifecycle', () => {
     expect(game.view).toMatchObject({ phase: 'simulating', scores: [0, 0], remaining: 2, activeCoinId: 'A' });
     expect(game.shoot({ x: 1, z: 0 }, 0.6)).toBe(false);
     finish(game);
-    expect(game.view).toMatchObject({ phase: 'complete', scores: [1, 0], remaining: 1, activeCoinId: 'B', chain: 1 });
+    expect(game.view).toMatchObject({ phase: 'complete', scores: [1, 0], remaining: 1, activeCoinId: 'B', chain: 1, canSelectCoin: false });
+    expect(game.selectCoin('B')).toBe(false);
     const finalB = game.frame.coins[0].position;
     game.tick(10); expect(game.frame.coins[0].position).toEqual(finalB); expect(game.view.scores).toEqual([1, 0]);
   });
-  it('allows B to continue into C after A legally hits B', async () => {
-    const game = await session(level([['A', -0.22, 0], ['B', 0, 0], ['C', 0.16, 0]]));
+  it('preserves free starting selection across pause and resume when player 2 starts Battle', async () => {
+    const game = await GameSession.create(level(), 'battle', 1); sessions.push(game);
+    game.pause();
+    expect(game.selectCoin('B')).toBe(false);
+    expect(game.shoot({ x: 1, z: 0 }, 0.5)).toBe(false);
+    game.resume();
+    expect(game.selectCoin('B')).toBe(true);
+    game.pause();
+    expect(game.selectCoin('A')).toBe(false);
+    game.resume();
+    expect(game.selectCoin('A')).toBe(true);
+    expect(game.view).toMatchObject({ phase: 'ready', currentPlayer: 1, activeCoinId: 'A', canSelectCoin: true, shotCount: 0 });
+  });
+  it.each(['challenge', 'battle'] as const)('locks %s continuation to B after A legally hits B', async (mode) => {
+    const game = await session(level([['A', -0.22, 0], ['B', 0, 0], ['C', 0.16, 0]]), mode);
     const cStart = game.frame.coins.find((coin) => coin.id === 'C')!.position;
     game.shoot({ x: 1, z: 0 }, 0.85);
     finish(game);
-    expect(game.view).toMatchObject({ phase: 'ready', scores: [1, 0], activeCoinId: 'B', remaining: 2, chain: 1 });
+    expect(game.view).toMatchObject({ phase: 'ready', scores: [1, 0], activeCoinId: 'B', remaining: 2, chain: 1, canSelectCoin: false });
     expect(game.view.foulReasons).toEqual([]);
+    // Relay continuation fixes control to the hit coin: no re-picking while the run continues.
+    expect(game.selectCoin('C')).toBe(false);
+    game.pause(); expect(game.selectCoin('C')).toBe(false); game.resume();
+    expect(game.selectCoin('C')).toBe(false);
+    expect(game.view).toMatchObject({ phase: 'ready', activeCoinId: 'B' });
     expect(game.frame.coins.some((coin) => coin.id === 'A')).toBe(false);
     const cFinal = game.frame.coins.find((coin) => coin.id === 'C')!.position;
     expect(Math.hypot(cFinal.x - cStart.x, cFinal.z - cStart.z)).toBeGreaterThan(0.005);
@@ -68,15 +96,21 @@ describe('production physics and session lifecycle', () => {
     const challenge = await session();
     challenge.shoot({ x: 0, z: 1 }, 0.3); finish(challenge);
     expect(challenge.view).toMatchObject({ phase: 'failed', scores: [0, 0], foulReasons: ['MISS'] });
+    expect(challenge.selectCoin('B')).toBe(false);
     const battle = await session(level(), 'battle');
     const start = battle.frame.coins[0].position;
     battle.shoot({ x: 0, z: 1 }, 0.3); finish(battle);
-    expect(battle.view).toMatchObject({ phase: 'selecting', currentPlayer: 1, activeCoinId: null, remaining: 2, scores: [0, 0] });
+    expect(battle.view).toMatchObject({ phase: 'selecting', currentPlayer: 1, activeCoinId: null, remaining: 2, scores: [0, 0], canSelectCoin: true });
     expect(battle.frame.coins[0].position.z).toBeGreaterThan(start.z + 0.02);
     expect(battle.selectCoin('A')).toBe(true);
     expect(battle.view).toMatchObject({ phase: 'ready', activeCoinId: 'A' });
     expect(battle.selectCoin('B')).toBe(true);
-    expect(battle.view).toMatchObject({ phase: 'ready', activeCoinId: 'B' });
+    expect(battle.selectCoin('A')).toBe(true);
+    expect(battle.view).toMatchObject({ phase: 'ready', activeCoinId: 'A', canSelectCoin: true });
+    battle.shoot({ x: 0, z: 1 }, 0.1); finish(battle);
+    expect(battle.view).toMatchObject({ phase: 'selecting', currentPlayer: 0, canSelectCoin: true });
+    expect(battle.selectCoin('B')).toBe(true);
+    expect(battle.selectCoin('A')).toBe(true);
   });
   it('a fall reducing Challenge to the last coin is failure, and Battle is a draw', async () => {
     const layout = level([['A', 0.5, 0], ['B', -0.35, 0.3]]);
@@ -109,6 +143,9 @@ describe('production physics and session lifecycle', () => {
     const game = await session();
     for (const [direction, power] of [[{ x: 0, z: 0 }, 0.5], [{ x: NaN, z: 1 }, 0.5], [{ x: Number.MAX_VALUE, z: Number.MAX_VALUE }, 0.5], [{ x: 1, z: 0 }, Infinity], [{ x: 1, z: 0 }, 1.1], [{ x: 1, z: 0 }, 0.01]] as const) expect(game.shoot(direction, power)).toBe(false);
     expect(game.view.shotCount).toBe(0);
+    expect(game.view.canSelectCoin).toBe(true);
+    expect(game.selectCoin('B')).toBe(true);
+    expect(game.selectCoin('A')).toBe(true);
     game.shoot({ x: 1, z: 0 }, 0.6); game.tick(1 / 60); game.pause();
     const frame = game.frame;
     game.tick(100); expect(game.frame).toEqual(frame); expect(game.shoot({ x: 1, z: 0 }, 0.6)).toBe(false);
@@ -151,6 +188,7 @@ describe('production physics and session lifecycle', () => {
     expect(game.view).toMatchObject({ phase: 'error', scores: [0, 0], remaining: 2, activeCoinId: 'A' });
     expect(game.frame.coins.map((coin) => coin.id)).toEqual(['A', 'B']);
     expect(game.shoot({ x: 1, z: 0 }, 0.7)).toBe(false);
+    expect(game.selectCoin('B')).toBe(false);
   });
   it('TIMEOUT freezes, scores zero, and continues Battle only with supported survivors', async () => {
     const game = await session(level(), 'battle');

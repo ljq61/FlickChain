@@ -75,6 +75,35 @@ describe('real Rapier 3D world', () => {
     expect(world.applyShot('A', { x: 1, z: 0 }, 1)).toBe(false);
     expect(world.frame.coins).toEqual([]);
   });
+  it('uses a true circular top: a diagonal shot tips and falls inside the old bounding square', async () => {
+    const layout = level([['A', 0.5, 0.5], ['B', -0.3, 0]]);
+    layout.table = { shape: 'circle', width: 1.6, depth: 1.6, materialId: 'wood' };
+    const circle = await PhysicsWorld.create(layout);
+    const rectangle = await PhysicsWorld.create({ ...layout, table: { ...layout.table, shape: 'rectangle' } });
+    try {
+      expect(circle.isSettled()).toBe(true);
+      expect(circle.frame.coins[0].position.y).toBeCloseTo(COIN_THICKNESS / 2, 2);
+      expect(circle.applyShot('A', { x: 1, z: 1 }, 0.55)).toBe(true);
+      expect(rectangle.applyShot('A', { x: 1, z: 1 }, 0.55)).toBe(true);
+      const falls: string[] = [];
+      let tipped = false;
+      for (let i = 0; i < 300; i++) {
+        const events = circle.step(); rectangle.step();
+        falls.push(...events.fallenCoinIds);
+        const coin = circle.frame.coins.find((entry) => entry.id === 'A')!;
+        tipped ||= Math.abs(coin.rotation.x) + Math.abs(coin.rotation.z) > 0.01;
+        if (events.fallenCoinIds.includes('A')) {
+          expect(Math.abs(coin.position.x)).toBeLessThan(0.8);
+          expect(Math.abs(coin.position.z)).toBeLessThan(0.8);
+          expect(Math.hypot(coin.position.x, coin.position.z)).toBeGreaterThan(0.8);
+        }
+      }
+      expect(falls).toEqual(['A']); expect(tipped).toBe(true);
+      expect(circle.hasCoin('A')).toBe(false);
+      expect(rectangle.hasCoin('A')).toBe(true); expect(rectangle.isSettled()).toBe(true);
+      expect(rectangle.frame.coins[0].position.y).toBeCloseTo(COIN_THICKNESS / 2, 2);
+    } finally { circle.dispose(); rectangle.dispose(); }
+  });
   it('rejects overlapping, invalid and dangerous initial layouts', async () => {
     await expect(PhysicsWorld.create(level([['A', 0, 0], ['B', 0.02, 0]]))).rejects.toThrow(/重叠|相交/);
     await expect(PhysicsWorld.create(level([['A', 0.58, 0], ['B', 0, 0]]))).rejects.toThrow(/桌边|贴边/);

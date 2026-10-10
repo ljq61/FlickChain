@@ -1,5 +1,6 @@
-import type { LevelConfig, ObstacleConfig } from '../types/contracts';
+import type { LevelConfig, ObstacleConfig, TableConfig } from '../types/contracts';
 import { COIN_RADIUS, PHYSICS_CONFIG } from '../physics/MaterialRegistry';
+import { tableClearance } from '../physics/TableGeometry';
 
 type RecordValue = Record<string, unknown>;
 const fail = (path: string, message: string): never => { throw new Error(`关卡 ${path}: ${message}`); };
@@ -41,10 +42,14 @@ function overlaps(a: ObstacleConfig, b: ObstacleConfig): boolean {
 export function validateLevel(input: unknown): LevelConfig {
   const raw = record(input, 'root', ['schemaVersion', 'id', 'name', 'lesson', 'table', 'coins', 'activeCoinId', 'obstacles']);
   if (raw.schemaVersion !== 1) fail('schemaVersion', '仅支持版本 1');
-  const table = record(raw.table, 'table', ['width', 'depth', 'materialId']);
+  const table = record(raw.table, 'table', ['width', 'depth', 'materialId', 'shape']);
   if (table.materialId !== 'wood') fail('table.materialId', '未知桌面材质');
   const width = finite(table.width, 'table.width', true);
   const depth = finite(table.depth, 'table.depth', true);
+  if (table.shape !== undefined && table.shape !== 'rectangle' && table.shape !== 'circle') fail('table.shape', '未知桌面形状');
+  if (table.shape === 'circle' && width !== depth) fail('table', '圆桌 width 与 depth 必须为相同直径');
+  const tableConfig: TableConfig = { width, depth, materialId: 'wood' };
+  if (table.shape !== undefined) tableConfig.shape = table.shape as TableConfig['shape'];
   if (width <= COIN_RADIUS * 4 || depth <= COIN_RADIUS * 4) fail('table', '尺寸不足以支撑硬币');
   const ids = new Set<string>();
   const unique = (value: unknown, path: string): string => {
@@ -59,8 +64,7 @@ export function validateLevel(input: unknown): LevelConfig {
     if (coin.materialId !== 'standard') fail(`${path}.materialId`, '未知硬币材质');
     const x = finite(coin.x, `${path}.x`);
     const z = finite(coin.z, `${path}.z`);
-    if (Math.abs(x) + COIN_RADIUS + PHYSICS_CONFIG.initialClearance >= width / 2
-      || Math.abs(z) + COIN_RADIUS + PHYSICS_CONFIG.initialClearance >= depth / 2) fail(path, '硬币越界或贴边');
+    if (tableClearance(tableConfig, x, z) <= COIN_RADIUS + PHYSICS_CONFIG.initialClearance) fail(path, '硬币越界或贴边');
     return { id: unique(coin.id, `${path}.id`), x, z, materialId: 'standard' as const };
   });
   if (coins.length < 2) fail('coins', 'CLEAR_ALL 至少需要两枚硬币');
@@ -75,8 +79,12 @@ export function validateLevel(input: unknown): LevelConfig {
       width: finite(box.width, `${path}.width`, true), depth: finite(box.depth, `${path}.depth`, true),
     };
     if (box.rotation !== undefined) result.rotation = finite(box.rotation, `${path}.rotation`);
-    if (Math.abs(result.x) + extent(result, [1, 0]) >= width / 2
-      || Math.abs(result.z) + extent(result, [0, 1]) >= depth / 2) fail(path, '障碍越界或贴边');
+    const [a, b] = axes(result);
+    for (const sideX of [-1, 1]) for (const sideZ of [-1, 1]) {
+      const x = result.x + sideX * a[0] * result.width / 2 + sideZ * b[0] * result.depth / 2;
+      const z = result.z + sideX * a[1] * result.width / 2 + sideZ * b[1] * result.depth / 2;
+      if (tableClearance(tableConfig, x, z) <= 0) fail(path, '障碍越界或贴边');
+    }
     return result;
   });
   for (let i = 0; i < coins.length; i++) {
@@ -98,5 +106,5 @@ export function validateLevel(input: unknown): LevelConfig {
     }
   }
   return { schemaVersion: 1, id: string(raw.id, 'id'), name: string(raw.name, 'name'), lesson: string(raw.lesson, 'lesson'),
-    table: { width, depth, materialId: 'wood' }, coins, activeCoinId, obstacles };
+    table: tableConfig, coins, activeCoinId, obstacles };
 }

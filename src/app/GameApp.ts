@@ -26,6 +26,7 @@ export class GameApp {
   private previousView: GameView | null = null;
   private battleFirst: 0 | 1 = 0;
   private disposed = false;
+  private lastLoad: { mode: GameMode; levelId: string; menu: boolean } | null = null;
 
   constructor(root: HTMLElement) {
     this.sound.enabled = this.progress.sound;
@@ -58,6 +59,7 @@ export class GameApp {
   private async load(mode: GameMode, levelId: string, menu: boolean): Promise<void> {
     const level = LEVELS.find(item => item.id === levelId);
     if (!level || this.disposed) return;
+    this.lastLoad = { mode, levelId, menu };
     const generation = ++this.generation;
     this.loading = true;
     this.pointer.cancel();
@@ -69,6 +71,8 @@ export class GameApp {
     this.shell.setError(null);
     this.shell.setLoading('正在准备桌面…');
     try {
+      await this.scene.initializeHand();
+      if (this.disposed || generation !== this.generation) return;
       const candidate = await GameSession.create(level, mode, mode === 'battle' ? this.battleFirst : 0);
       if (this.disposed || generation !== this.generation) { candidate.dispose(); return; }
       this.session = candidate;
@@ -106,18 +110,25 @@ export class GameApp {
     if (!this.menu && !this.loading && this.session?.shoot(direction, power)) this.sound.play('flick');
   }
 
-  /** Tapping a coin starts the run; while ready, it switches the launch coin. No confirm step. */
+  /** Entry/turn launch choices stay editable until firing; relay targets stay fixed. */
   private pickCoin(id: string): void {
     if (this.menu || this.loading || !this.session) return;
     const view = this.session.view;
-    if ((view.phase !== 'selecting' && view.phase !== 'ready') || !this.session.frame.coins.some((coin) => coin.id === id)) return;
+    if (!view.canSelectCoin || !['selecting', 'ready'].includes(view.phase) || !this.session.frame.coins.some((coin) => coin.id === id)) return;
     if (!this.session.selectCoin(id)) return;
     this.scene.focusCoin(id);
     this.shell.render(this.session.view, this.progress.completed, this.progress.sound);
   }
 
   private async retry(): Promise<void> {
-    if (this.loading || !this.session) return;
+    if (this.loading) return;
+    if (!this.session) {
+      if (this.lastLoad) {
+        this.sound.unlock();
+        await this.load(this.lastLoad.mode, this.lastLoad.levelId, this.lastLoad.menu);
+      }
+      return;
+    }
     const view = this.session.view;
     if (view.phase === 'simulating') return;
     if (view.mode === 'battle' && view.phase === 'complete') this.battleFirst = this.battleFirst === 0 ? 1 : 0;

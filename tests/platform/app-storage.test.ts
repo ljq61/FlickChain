@@ -8,6 +8,7 @@ import type { GameMode, GameView, LevelConfig, WorldFrame } from '../../src/type
 // GameApp, Shell, SaveAdapter and the shipped level catalog remain real.
 const harness = vi.hoisted(() => ({
   sessions: [] as Array<{ view: GameView; frame: WorldFrame; dispose: ReturnType<typeof vi.fn> }>,
+  handLoad: vi.fn(async () => {}),
 }));
 
 vi.mock('../../src/core/GameSession', () => ({
@@ -21,6 +22,7 @@ vi.mock('../../src/core/GameSession', () => ({
           phase: 'ready' as const,
           levelId: level.id,
           activeCoinId: level.activeCoinId,
+          canSelectCoin: true,
           currentPlayer: 0 as const,
           scores: [0, 0] as [number, number],
           remaining: level.coins.length,
@@ -43,7 +45,7 @@ vi.mock('../../src/core/GameSession', () => ({
 }));
 
 vi.mock('../../src/rendering/SceneManager', () => ({
-  SceneManager: class { setLevel = vi.fn(); render = vi.fn(); focusCoin = vi.fn(); clearFocus = vi.fn(); dispose = vi.fn(); },
+  SceneManager: class { initializeHand = harness.handLoad; setLevel = vi.fn(); render = vi.fn(); focusCoin = vi.fn(); clearFocus = vi.fn(); dispose = vi.fn(); },
 }));
 vi.mock('../../src/input/PointerInput', () => ({
   PointerInput: class { cancel = vi.fn(); dispose = vi.fn(); charge = vi.fn(() => null); },
@@ -64,6 +66,7 @@ describe('app progress recovery and non-blocking save notices', () => {
 
   beforeEach(() => {
     harness.sessions.length = 0;
+    harness.handLoad.mockReset().mockResolvedValue(undefined);
     frameTime = 0;
     raf = undefined;
     root = document.createElement('div');
@@ -122,6 +125,29 @@ describe('app progress recovery and non-blocking save notices', () => {
     session.view = { ...session.view, phase: 'complete', scores: [LEVELS[0].coins.length - 1, 0], remaining: 1 };
     advanceFrame();
   }
+
+  it.each(['boot', 'entry'] as const)('the error rebuild button retries a failed hand load during %s', async (stage) => {
+    if (stage === 'entry') await initialize();
+    harness.handLoad.mockRejectedValueOnce(new Error('Hand model request failed (503)'));
+    if (stage === 'boot') {
+      app = new GameApp(root);
+      await app.initialize();
+    } else {
+      element<HTMLButtonElement>('[data-action="levels"]').click();
+      element<HTMLButtonElement>(`[data-level-id="${LEVELS[0].id}"]`).click();
+    }
+    await vi.waitFor(() => expect(element('[data-el="modal-description"]').textContent).toContain('503'));
+    const count = harness.handLoad.mock.calls.length;
+    expect(element<HTMLButtonElement>('[data-el="modal-primary"]').dataset.action).toBe('retry');
+    element<HTMLButtonElement>('[data-el="modal-primary"]').click();
+    await vi.waitFor(() => {
+      expect(harness.handLoad).toHaveBeenCalledTimes(count + 1);
+      expect(element('[data-el="loading"]').hidden).toBe(true);
+      expect(element('[data-el="modal-layer"]').hidden).toBe(true);
+      expect(element('.flick-shell').dataset.screen).toBe(stage === 'boot' ? 'home' : 'game');
+    });
+    expect(harness.sessions.at(-1)!.view.levelId).toBe(LEVELS[0].id);
+  });
 
   it.each(['corrupt-json', 'read-security-error'] as const)('%s keeps first-level play available', async (failure) => {
     if (failure === 'corrupt-json') storage.getItem.mockReturnValue('{broken-json');

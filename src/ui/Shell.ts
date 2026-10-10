@@ -163,7 +163,12 @@ export class Shell {
       if (view.phase === 'selecting') {
         title = '点选一枚硬币直接开始';
         description = '点中的硬币立即成为当前币；旋转空白区域可改变视角';
-      } else if (view.phase === 'ready') { title = '按住硬币后的手指蓄力'; description = '按得越久力度越大，松手沿视角前方弹射；点其他硬币可切换'; }
+      } else if (view.phase === 'ready') {
+        title = '按住硬币后的手指蓄力';
+        description = view.canSelectCoin
+          ? '首杆发射前可点其他硬币换起手；按得越久力度越大，松手弹射'
+          : '接着刚击中的硬币继续；按得越久力度越大，松手弹射';
+      }
       else if (failedDuringShot) { title = view.foulReasons.map((reason) => FOUL_TEXT[reason]).join(' · '); description = battle ? '本杆不得分，停稳后交给下一位玩家' : '本次闯关失败，停稳后即可重试'; turn = '失误 · 正在收尾'; }
       else if (view.phase === 'simulating') { title = '让硬币停一停'; description = '整杆停稳后，才能计分并接力'; turn = '弹射中'; }
       else if (view.phase === 'paused') { title = '棋盘已暂停'; description = '继续后从当前棋盘接着玩'; turn = '稍作休息'; }
@@ -173,7 +178,7 @@ export class Shell {
       this.text('turn-label', turn);
       this.text('prompt-title', title);
       this.text('prompt-description', description);
-      const announcement = `${view.sessionId}:${view.phase}:${view.currentPlayer}:${view.foulReasons.join(',')}`;
+      const announcement = `${view.sessionId}:${view.phase}:${view.currentPlayer}:${view.canSelectCoin}:${view.foulReasons.join(',')}`;
       if (announcement !== this.announced) { this.announced = announcement; this.text('live', `${turn}。${title}。${description}`); }
     }
     this.updateLayers();
