@@ -211,12 +211,12 @@ describe('continuous Challenge app and persistence', () => {
     for (const coin of survivors) expect(session.frame.coins.find(item => item.id === coin.id)).toEqual(coin);
     expect(harness.arrivals.at(-1)).toHaveLength(fallenCount);
     expect(session.view).toMatchObject({ scores: [2, 0], canSelectCoin: true, activeCoinId: null, phase: 'selecting' });
-    expect(node('[data-el="revive-count"]').textContent).toContain('2 次');
+    expect(node('.remaining-cell').textContent).toBe('2次机会');
     for (const allowance of [1, 0]) {
       fail();
       expect(node<HTMLButtonElement>('[data-el="modal-primary"]').dataset.action).toBe('revive');
       node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames(90);
-      expect(node('[data-el="revive-count"]').textContent).toContain(`${allowance} 次`);
+      expect(node('.remaining-cell').textContent).toBe(`${allowance}次机会`);
     }
     expect(session.revive).toHaveBeenCalledTimes(3);
     fail();
@@ -227,7 +227,7 @@ describe('continuous Challenge app and persistence', () => {
 
   it('introduces iron and marble exactly in their first campaign round and clears their next-round tips', async () => {
     await initialize(); await start(); frames(90);
-    expect(node('[data-el="revive-count"]').textContent).toContain('3 次');
+    expect(node('.remaining-cell').textContent).toBe('3次机会');
     const next = () => { complete(); frames(180); };
     next();
     expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('青色铁币');

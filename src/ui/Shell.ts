@@ -12,6 +12,9 @@ const FOUL_TEXT: Record<FoulReason, string> = {
 const COIN_ICON = '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="24" r="16" stroke="currentColor"/><circle cx="24" cy="24" r="12" stroke="currentColor" stroke-width="1.5"/><path d="M24 4v4m20 16h-4M24 44v-4M4 24h4" stroke="currentColor" stroke-width="2"/></svg>';
 const PEOPLE_ICON = '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="17" cy="14" r="6" stroke="currentColor" stroke-width="2"/><circle cx="33" cy="15" r="5" stroke="currentColor" stroke-width="2"/><path d="M5 39v-6a12 12 0 0 1 24 0v6H5Zm24-16a10 10 0 0 1 14 9v7H33" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHEVRON_ICON = '<svg class="button-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const PLAY_ICON = '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m11 7 14 9-14 9V7Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+const RESTART_ICON = '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 12a10 10 0 1 1-1 8M7 5v7h7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const HOME_ICON = '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m4 15 12-10 12 10M7 13v14h7v-8h4v8h7V13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 interface Callbacks {
   start: (mode: GameMode, levelId: string) => void;
@@ -56,7 +59,7 @@ export class Shell {
         <div class="menu-actions"><button type="button" class="primary-button menu-button" data-action="challenge"><span class="button-icon">${COIN_ICON}</span><span class="button-label">单人游戏</span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button" data-action="battle"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">本地双人</span>${CHEVRON_ICON}</button><p class="menu-progress" data-el="progress">本地最高 0 分</p></div>
         <p class="table-caption">同一张桌，所有硬币都公共</p>
       </main>
-      <section class="game-hud" data-el="hud" hidden aria-label="对局信息"><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective">留住最后一枚，继续下一轮</p></div><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><span data-el="score-one-label">接力得分</span><strong data-el="score-one">0</strong></div><div class="score-cell" data-el="player-two" hidden><span>玩家二</span><strong data-el="score-two">0</strong></div><div class="remaining-cell"><strong data-el="remaining">2</strong><span>枚剩余</span></div></div><p class="revive-count" data-el="revive-count" hidden>剩余复活 3 次</p></div></section>
+      <section class="game-hud" data-el="hud" hidden aria-label="对局信息"><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><strong data-el="score-one">0</strong><span data-el="score-one-label">分</span></div><div class="score-cell" data-el="player-two" hidden><span>玩家二</span><strong data-el="score-two">0</strong></div><div class="remaining-cell"><strong data-el="remaining">3</strong><span data-el="remaining-label">次机会</span></div></div><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective" hidden>留住最后一枚，继续下一轮</p></div></div></section>
       <footer class="play-footer" data-el="footer" hidden><div class="shot-prompt" data-el="shot-prompt"><div class="turn-label" data-el="turn-label" hidden></div><h2 data-el="prompt-title">旋转视角，准备弹射</h2><p data-el="prompt-description">空白处拖动旋转 · 点选硬币开始</p><p class="tutorial-tip" data-el="tutorial-tip" hidden></p></div><p class="best-score" data-el="best-score" hidden>本地最高 0 分</p></footer>
       <div class="status-live" data-el="live" role="status" aria-live="polite" aria-atomic="true"></div>
       <aside class="notice-toast" data-el="notice" hidden aria-label="保存提示"><p data-el="notice-message" role="status"></p><button type="button" class="notice-dismiss" data-action="dismiss-notice" aria-label="关闭保存提示">关闭</button></aside>
@@ -118,14 +121,14 @@ export class Shell {
       this.node('mode').hidden = !battle;
       this.text('level-name', battle ? '最后一枚' : `第 ${round} 轮`);
       this.text('objective', battle ? '合法接力 +1，失误换人；累计分高者获胜' : '留住最后一枚，继续下一轮');
-      this.text('revive-count', `剩余复活 ${campaign?.revivesRemaining ?? 3} 次`);
-      this.node('revive-count').hidden = battle;
+      this.node('objective').hidden = !battle;
       this.text('best-score', `本地最高 ${campaign?.bestScore ?? 0} 分`);
       this.node('best-score').hidden = false;
-      this.text('score-one-label', battle ? '玩家一' : '累计分');
+      this.text('score-one-label', battle ? '玩家一' : '分');
       this.text('score-one', String(battle ? view.scores[0] : campaign?.score ?? view.scores[0]));
       this.text('score-two', String(view.scores[1]));
-      this.text('remaining', String(view.remaining));
+      this.text('remaining', String(battle ? view.remaining : campaign?.revivesRemaining ?? 3));
+      this.text('remaining-label', battle ? '枚剩余' : '次机会');
       this.node('player-two').hidden = !battle;
       this.node('player-one').dataset.active = String(battle && view.currentPlayer === 0);
       this.node('player-two').dataset.active = String(battle && view.currentPlayer === 1);
@@ -196,9 +199,20 @@ export class Shell {
     if (message) this.text('notice-message', message);
   }
 
-  private button(name: string, label: string, action: string, hidden = false): void {
+  private button(name: string, label: string, action: string, hidden = false, icon?: string): void {
     const button = this.node<HTMLButtonElement>(name);
-    this.text(name, label);
+    if (icon) {
+      if (button.dataset.icon !== action) button.innerHTML = icon;
+      button.dataset.icon = action;
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    } else {
+      this.text(name, label);
+      delete button.dataset.icon;
+      button.removeAttribute('aria-label');
+      button.removeAttribute('title');
+    }
+    button.classList.toggle('modal-icon-button', !!icon);
     button.dataset.action = action;
     button.hidden = hidden;
     button.disabled = false;
@@ -208,6 +222,7 @@ export class Shell {
     const view = this.view;
     const error = this.externalError ?? (view?.phase === 'error' ? view.error : null);
     const state = error ? 'error' : view && (['failed', 'paused', 'error'].includes(view.phase) || (view.mode === 'battle' && view.phase === 'complete')) ? view.phase : '';
+    this.node('modal').dataset.variant = state === 'paused' ? 'settings' : 'result';
     this.node('loading').hidden = !this.loading || !!state;
     if (this.loading) this.text('loading-message', this.loading);
     this.node('modal-layer').hidden = !state;
@@ -216,13 +231,13 @@ export class Shell {
       let description = '';
       let score = '';
       this.text('modal-kicker', state === 'paused' ? '设置' : state === 'error' ? '恢复棋盘' : view?.mode === 'battle' ? '本地双人 · 对局结果' : '单人闯关 · 本次结果');
-      this.button('modal-tertiary', '返回菜单', 'home', true);
+      if (state !== 'paused') this.button('modal-tertiary', '返回菜单', 'home', true);
       if (state === 'paused') {
         title = '游戏设置';
         description = '棋盘和分数都为你保留着。';
-        this.button('modal-primary', '继续游戏', 'pause');
-        this.button('modal-secondary', '重新开始', 'retry');
-        this.button('modal-tertiary', '返回菜单', 'home');
+        this.button('modal-primary', '继续游戏', 'pause', false, PLAY_ICON);
+        this.button('modal-secondary', '重新开始', 'retry', false, RESTART_ICON);
+        this.button('modal-tertiary', '返回菜单', 'home', false, HOME_ICON);
       } else if (state === 'error') {
         title = '重新准备一下棋盘';
         description = error ?? '本局出现异常，请重建棋盘后继续。';

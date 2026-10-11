@@ -99,20 +99,26 @@ describe('Shell instant coin start UI', () => {
     expect(callbacks.next).not.toHaveBeenCalled();
   });
 
-  it('shows cumulative score, puts revives below the scoreboard and the best in the footer', () => {
-    shell.render(view('ready'), [], true, false, campaign);
+  it('shows points and remaining opportunities, with the small round below the panel and best in the footer', () => {
+    shell.render({ ...view('ready'), remaining: 8 }, [], true, false, campaign);
     expect(root.querySelector('[data-el="level-name"]')!.textContent).toBe('第 3 轮');
     expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('9');
+    expect(root.querySelector('[data-el="player-one"]')!.textContent).toBe('9分');
+    expect(root.querySelector('.remaining-cell')!.textContent).toBe('3次机会');
+    expect(root.querySelector('[data-el="scoreboard"]')!.textContent).not.toMatch(/累计|枚剩余/);
     expect(root.querySelector('[data-el="campaign-meta"]')).toBeNull();
     expect(root.querySelector('.level-info')!.textContent).not.toMatch(/最高|复活/);
-    const revive = root.querySelector<HTMLElement>('[data-el="revive-count"]')!;
-    expect(root.querySelector('[data-el="scoreboard"]')!.nextElementSibling).toBe(revive);
-    expect(revive.textContent).toBe('剩余复活 3 次');
-    expect(revive.hidden).toBe(false);
+    expect(root.querySelector('[data-el="scoreboard"]')!.nextElementSibling).toBe(root.querySelector('.level-info'));
+    expect(root.querySelector('[data-el="revive-count"]')).toBeNull();
+    expect(root.querySelector<HTMLElement>('[data-el="objective"]')!.hidden).toBe(true);
     expect(root.querySelector('[data-el="footer"] [data-el="best-score"]')!.textContent).toBe('本地最高 17 分');
+    shell.render(view('ready'), [], true, false, { ...campaign, revivesRemaining: 2 });
+    expect(root.querySelector('.remaining-cell')!.textContent).toBe('2次机会');
     shell.render(view('ready'), [], true, false, { ...campaign, revivesRemaining: 0, bestScore: 18 });
-    expect(revive.textContent).toBe('剩余复活 0 次');
+    expect(root.querySelector('.remaining-cell')!.textContent).toBe('0次机会');
     expect(root.querySelector('[data-el="best-score"]')!.textContent).toBe('本地最高 18 分');
+    shell.render(view('ready'), [], true);
+    expect(root.querySelector('.remaining-cell')!.textContent).toBe('3次机会');
   });
 
   it('omits the redundant single player turn while retaining battle turn ownership', () => {
@@ -179,11 +185,56 @@ describe('Shell instant coin start UI', () => {
     const primary = root.querySelector<HTMLButtonElement>('[data-el="modal-primary"]')!;
     const secondary = root.querySelector<HTMLButtonElement>('[data-el="modal-secondary"]')!;
     const tertiary = root.querySelector<HTMLButtonElement>('[data-el="modal-tertiary"]')!;
-    expect(primary.textContent).toBe('继续游戏');
-    expect(secondary.textContent).toBe('重新开始');
+    expect(root.querySelector('[data-el="modal"]')!.getAttribute('data-variant')).toBe('settings');
+    for (const [button, label] of [[primary, '继续游戏'], [secondary, '重新开始'], [tertiary, '返回菜单']] as const) {
+      expect(button.textContent).toBe('');
+      expect(button.getAttribute('aria-label')).toBe(label);
+      expect(button.title).toBe(label);
+      expect(button.classList.contains('modal-icon-button')).toBe(true);
+      expect(button.querySelector('svg[aria-hidden="true"] path')).not.toBeNull();
+    }
     expect(tertiary.hidden).toBe(false);
+    const icon = primary.firstElementChild;
+    shell.render(view('paused'), [], true, false, campaign);
+    expect(primary.firstElementChild).toBe(icon);
     primary.click(); secondary.click(); tertiary.click();
     expect(callbacks.pause).toHaveBeenCalledExactlyOnceWith();
+    expect(callbacks.retry).toHaveBeenCalledExactlyOnceWith();
+    expect(callbacks.home).toHaveBeenCalledExactlyOnceWith();
+  });
+
+  it('restores ordinary result and error actions after the settings icons without stale accessible names', () => {
+    const primary = root.querySelector<HTMLButtonElement>('[data-el="modal-primary"]')!;
+    const secondary = root.querySelector<HTMLButtonElement>('[data-el="modal-secondary"]')!;
+    const tertiary = root.querySelector<HTMLButtonElement>('[data-el="modal-tertiary"]')!;
+    shell.render(view('paused'), [], true, false, campaign);
+    shell.render({ ...view('failed'), foulReasons: ['MISS'] }, [], true, false, campaign);
+    expect(root.querySelector('[data-el="modal"]')!.getAttribute('data-variant')).toBe('result');
+    for (const [button, label] of [[primary, '复活继续'], [secondary, '重新开始'], [tertiary, '返回菜单']] as const) {
+      expect(button.textContent).toBe(label);
+      expect(button.querySelector('svg')).toBeNull();
+      expect(button.hasAttribute('aria-label')).toBe(false);
+      expect(button.hasAttribute('title')).toBe(false);
+      expect(button.classList.contains('modal-icon-button')).toBe(false);
+      expect(button.dataset.icon).toBeUndefined();
+    }
+    primary.click();
+    expect(callbacks.revive).toHaveBeenCalledExactlyOnceWith();
+    expect(callbacks.pause).not.toHaveBeenCalled();
+    shell.render(view('paused'), [], true, false, campaign);
+    shell.setError('测试重建棋盘');
+    expect(primary.textContent).toBe('重建本局');
+    expect(primary.dataset.action).toBe('retry');
+    expect(secondary.textContent).toBe('返回菜单');
+    expect(secondary.dataset.action).toBe('home');
+    expect(tertiary.hidden).toBe(true);
+    for (const button of [primary, secondary, tertiary]) {
+      expect(button.querySelector('svg')).toBeNull();
+      expect(button.hasAttribute('aria-label')).toBe(false);
+      expect(button.hasAttribute('title')).toBe(false);
+      expect(button.classList.contains('modal-icon-button')).toBe(false);
+    }
+    primary.click(); secondary.click();
     expect(callbacks.retry).toHaveBeenCalledExactlyOnceWith();
     expect(callbacks.home).toHaveBeenCalledExactlyOnceWith();
   });
@@ -219,7 +270,7 @@ describe('Shell instant coin start UI', () => {
     }
     expect(callbacks.revive).toHaveBeenCalledTimes(3);
     shell.render(view('selecting'), [], true, false, { ...campaign, revivesRemaining: 0 });
-    expect(root.querySelector('[data-el="revive-count"]')!.textContent).toBe('剩余复活 0 次');
+    expect(root.querySelector('.remaining-cell')!.textContent).toBe('0次机会');
     shell.render(failure, [], true, false, { ...campaign, revivesRemaining: 0 });
     expect(primary.textContent).toBe('再来一局');
     expect(primary.dataset.action).toBe('retry');
@@ -248,11 +299,22 @@ describe('Shell instant coin start UI', () => {
   it('keeps the local battle result and scores', () => {
     root.querySelector<HTMLButtonElement>('[data-action="battle"]')!.click();
     expect(callbacks.start).toHaveBeenCalledExactlyOnceWith('battle', level.id);
+    shell.render({ ...view('ready'), mode: 'battle', scores: [3, 5], currentPlayer: 1, remaining: 6 }, [], true, false, campaign);
+    expect(root.querySelector('[data-el="score-one-label"]')!.textContent).toBe('玩家一');
+    expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('3');
+    expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('5');
+    expect(root.querySelector<HTMLElement>('[data-el="player-two"]')!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>('[data-el="player-two"]')!.dataset.active).toBe('true');
+    expect(root.querySelector('.remaining-cell')!.textContent).toBe('6枚剩余');
+    expect(root.querySelector<HTMLElement>('[data-el="objective"]')!.hidden).toBe(false);
+    shell.render({ ...view('paused'), mode: 'battle' }, [], true, false, campaign);
     shell.render({ ...view('complete'), mode: 'battle', scores: [3, 5], winner: 1 }, [], true, false, { ...campaign, round: 0 });
-    expect(root.querySelector<HTMLElement>('[data-el="revive-count"]')!.hidden).toBe(true);
+    expect(root.querySelector('[data-el="revive-count"]')).toBeNull();
     expect(root.querySelector<HTMLElement>('[data-el="best-score"]')!.hidden).toBe(false);
     expect(root.querySelector('[data-el="best-score"]')!.textContent).toBe('本地最高 17 分');
     expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('玩家二获胜');
     expect(root.querySelector('[data-el="modal-score"]')!.textContent).toContain('3  :  5');
+    expect(root.querySelector('[data-el="modal-primary"]')!.textContent).toBe('再来一局');
+    expect(root.querySelector('[data-el="modal-primary"]')!.hasAttribute('aria-label')).toBe(false);
   });
 });
