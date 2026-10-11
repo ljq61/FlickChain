@@ -1,4 +1,4 @@
-type SoundKind = 'aim' | 'flick' | 'coin' | 'wall' | 'land' | 'success' | 'failure' | 'complete';
+type SoundKind = 'aim' | 'flick' | 'coin' | 'wall' | 'land' | 'success' | 'failure' | 'complete' | 'charge-failed';
 type SampleName = 'coin-hit-a' | 'coin-hit-b' | 'coin-land' | 'coin-wood';
 interface Voice { source: AudioScheduledSourceNode; nodes: AudioNode[] }
 interface SlideVoice extends Voice { source: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode }
@@ -15,11 +15,16 @@ export class SoundManager {
   private loadController: AbortController | null = null;
   private active = false;
   private soundEnabled = true;
+  private musicBuffer: AudioBuffer | null = null;
+  private musicVoice: Voice | null = null;
+  private musicLoading: Promise<void> | null = null;
+
+  constructor(private readonly backgroundMusic = false) {}
 
   get enabled(): boolean { return this.soundEnabled; }
   set enabled(value: boolean) {
     this.soundEnabled = value;
-    if (!value) this.stopAll();
+    if (!value) { this.stopAll(); this.stopMusic(); }
   }
 
   unlock(): void {
@@ -28,8 +33,12 @@ export class SoundManager {
       this.context ??= new AudioContext();
       this.active = true;
       // Always enqueue resume: suspend() may still be pending at this interaction.
-      void this.context.resume().catch(() => {});
+      const context = this.context;
+      void context.resume().then(() => {
+        if (this.active && this.enabled && this.context === context) this.startMusic();
+      }).catch(() => {});
       this.loadSamples(this.context);
+      this.loadMusic(this.context);
     } catch {
       // Audio is optional: browser audio restrictions cannot block a shot.
     }
@@ -58,7 +67,7 @@ export class SoundManager {
       }
       return;
     }
-    const notes = kind === 'complete' ? [523, 659, 784] : kind === 'success' ? [660, 880] : kind === 'failure' ? [196, 147] : kind === 'aim' ? [440] : [330];
+    const notes = kind === 'charge-failed' ? [392, 247, 165] : kind === 'complete' ? [523, 659, 784] : kind === 'success' ? [660, 880] : kind === 'failure' ? [196, 147] : kind === 'aim' ? [440] : [330];
     notes.forEach((frequency, index) => this.blip(frequency, kind === 'failure' ? 'triangle' : 'sine', (kind === 'aim' ? 0.018 : 0.045) * strength, kind === 'aim' ? 0.065 : 0.18, index * 0.09));
   }
 
@@ -130,6 +139,51 @@ export class SoundManager {
     return this.enabled && this.active && this.context?.state === 'running';
   }
 
+  private startMusic(): void {
+    if (!this.backgroundMusic || !this.ready() || this.musicVoice || !this.musicBuffer) return;
+    const context = this.context!;
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    source.buffer = this.musicBuffer;
+    source.loop = true;
+    gain.gain.setValueAtTime(0, context.currentTime);
+    gain.gain.linearRampToValueAtTime(0.16, context.currentTime + 1.4);
+    source.connect(gain).connect(context.destination);
+    const voice = { source, nodes: [source, gain] };
+    this.musicVoice = voice;
+    source.onended = () => {
+      if (this.musicVoice === voice) this.musicVoice = null;
+      voice.nodes.forEach(node => node.disconnect());
+    };
+    source.start();
+  }
+
+  private loadMusic(context: AudioContext): void {
+    if (!this.backgroundMusic || this.musicLoading) return;
+    const signal = this.loadController!.signal;
+    this.musicLoading = (async () => {
+      try {
+        const response = await fetch(`${import.meta.env.BASE_URL}audio/midnight-jazz.mp3`, { signal });
+        if (!response.ok) return;
+        const bytes = await response.arrayBuffer();
+        if (signal.aborted || this.context !== context) return;
+        const buffer = await context.decodeAudioData(bytes);
+        if (signal.aborted || this.context !== context) return;
+        this.musicBuffer = buffer;
+        this.startMusic();
+      } catch { /* Music is optional and cannot delay input or a shot. */ }
+    })();
+  }
+
+  private stopMusic(): void {
+    const voice = this.musicVoice;
+    this.musicVoice = null;
+    if (!voice) return;
+    voice.source.onended = null;
+    try { voice.source.stop(); } catch { /* Already stopped. */ }
+    voice.nodes.forEach(node => node.disconnect());
+  }
+
   private clamp(value: number): number { return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0; }
 
   private track(voice: Voice): void {
@@ -189,15 +243,19 @@ export class SoundManager {
   suspend(): void {
     this.active = false;
     this.stopAll();
+    this.stopMusic();
     if (this.context) void this.context.suspend().catch(() => {});
   }
 
   dispose(): void {
     this.active = false;
     this.stopAll();
+    this.stopMusic();
     this.loadController?.abort();
     if (this.context) void this.context.close().catch(() => {});
     this.context = null;
+    this.musicBuffer = null;
+    this.musicLoading = null;
     this.slideBuffer = null;
     this.samples.clear();
     this.loading = null;

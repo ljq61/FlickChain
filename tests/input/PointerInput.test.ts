@@ -10,8 +10,10 @@ describe('public launch choices and relay pointer ownership', () => {
   let view: GameView;
   let now: number;
   let orbit: ReturnType<typeof vi.fn>;
+  let blocked: boolean;
   const pickCoin = vi.fn();
   const shoot = vi.fn();
+  const chargeFailed = vi.fn();
   const frame: WorldFrame = {
     table: { width: 1.2, depth: 1.6, materialId: 'wood' }, obstacles: [],
     coins: ['A', 'B'].map((id, i) => ({ id, materialId: 'standard', position: { x: i * 0.2, y: 0.003, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } })),
@@ -21,6 +23,7 @@ describe('public launch choices and relay pointer ownership', () => {
   }
   function tap(x: number) { pointer('pointerdown', x); pointer('pointerup', x); }
   beforeEach(() => {
+    blocked = false;
     now = 1000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
     view = { sessionId: 'pointer-test', revision: 0, mode: 'challenge', phase: 'ready', levelId: 'test', activeCoinId: 'A', canSelectCoin: true, currentPlayer: 0, scores: [0, 0], remaining: 2, chain: 0, shotCount: 0, foulReasons: [], lastResult: null, winner: null, error: null };
@@ -34,7 +37,7 @@ describe('public launch choices and relay pointer ownership', () => {
       // One generous finger anchor overlaps B: coin selection must take priority.
       getFingerHitPoints: () => [{ x: 0.19, y: 0.02, z: 0 }, { x: -0.1, y: 0.02, z: 0 }],
     } as unknown as SceneManager;
-    input = new PointerInput(scene, () => ({ view, frame }), { pickCoin, shoot });
+    input = new PointerInput(scene, () => ({ view: blocked ? null : view, frame }), { pickCoin, shoot, chargeFailed });
   });
   afterEach(() => { input.dispose(); canvas.remove(); vi.restoreAllMocks(); vi.clearAllMocks(); });
   it('selects another public coin before firing without charging the previous finger', () => {
@@ -68,6 +71,41 @@ describe('public launch choices and relay pointer ownership', () => {
     pointer('pointerdown', 650); pointer('pointermove', 680); pointer('pointerup', 680);
     expect(orbit).toHaveBeenCalledWith(30, 0);
   });
+  it('expires at 3250 ms exactly once, restores the hand and requires a new hold', () => {
+    pointer('pointerdown', 200);
+    now += 3249;
+    expect(input.charge()?.elapsedMs).toBe(3249);
+    expect(chargeFailed).not.toHaveBeenCalled();
+    now++;
+    expect(input.charge()).toBeNull();
+    expect(chargeFailed).toHaveBeenCalledTimes(1);
+    now += 3000;
+    expect(input.charge()).toBeNull();
+    pointer('pointermove', 680);
+    pointer('pointerup', 680);
+    expect(shoot).not.toHaveBeenCalled();
+    expect(pickCoin).not.toHaveBeenCalled();
+    expect(orbit).not.toHaveBeenCalled();
+    expect(chargeFailed).toHaveBeenCalledTimes(1);
+    pointer('pointerdown', 200); now += 625; pointer('pointerup', 200);
+    expect(shoot).toHaveBeenCalledExactlyOnceWith({ x: 1, z: 0 }, .5);
+  });
+  it('release enforces the expiry deadline even when animation frames are skipped', () => {
+    pointer('pointerdown', 200); now += 3250; pointer('pointerup', 200);
+    expect(shoot).not.toHaveBeenCalled(); expect(chargeFailed).toHaveBeenCalledTimes(1);
+    expect(input.charge()).toBeNull();
+    pointer('pointerdown', 200); now += 3249; pointer('pointerup', 200);
+    expect(shoot).toHaveBeenCalledExactlyOnceWith({ x: 1, z: 0 }, 1);
+  });
+  it('invalid ownership, explicit cancellation, focus loss and extra pointers never play failure audio', () => {
+    pointer('pointerdown', 200); now += 3250; view.revision++;
+    expect(input.charge()).toBeNull(); pointer('pointerup', 200);
+    pointer('pointerdown', 200); now += 3250; input.cancel(); pointer('pointerup', 200);
+    pointer('pointerdown', 200); now += 3250; window.dispatchEvent(new Event('blur')); pointer('pointerup', 200);
+    pointer('pointerdown', 200); now += 3250; pointer('pointerdown', 300, 200, 2);
+    expect(input.charge()).toBeNull(); pointer('pointerup', 200); pointer('pointerup', 300, 200, 2);
+    expect(chargeFailed).not.toHaveBeenCalled(); expect(shoot).not.toHaveBeenCalled();
+  });
   it('rejects coins outside a circular rim even inside its rectangular bounding box', () => {
     const oldTable = frame.table;
     const oldPosition = frame.coins[1].position;
@@ -83,5 +121,29 @@ describe('public launch choices and relay pointer ownership', () => {
       frame.table = oldTable;
       frame.coins[1].position = oldPosition;
     }
+  });
+  it('uses the larger iron radius for picking instead of the gold radius', () => {
+    const material = frame.coins[1].materialId;
+    try {
+      tap(454);
+      expect(pickCoin).not.toHaveBeenCalled();
+      frame.coins[1].materialId = 'iron';
+      tap(454);
+      expect(pickCoin).toHaveBeenCalledExactlyOnceWith('B');
+    } finally { frame.coins[1].materialId = material; }
+  });
+  it('blocks introduction and round transition controls and releases a charge that loses ownership', () => {
+    blocked = true;
+    tap(400);
+    pointer('pointerdown', 650); pointer('pointermove', 680); pointer('pointerup', 680);
+    expect(pickCoin).not.toHaveBeenCalled(); expect(orbit).not.toHaveBeenCalled();
+    blocked = false;
+    vi.mocked(canvas.hasPointerCapture).mockReturnValue(true);
+    pointer('pointerdown', 200); now += 700;
+    blocked = true;
+    expect(input.charge()).toBeNull();
+    pointer('pointerup', 200);
+    expect(shoot).not.toHaveBeenCalled();
+    expect(canvas.releasePointerCapture).toHaveBeenCalledWith(1);
   });
 });

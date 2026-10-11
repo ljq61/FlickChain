@@ -11,6 +11,8 @@ export class GameSession {
   private accumulator = 0;
   private feedback: PhysicsFeedback[] = [];
   private facts: ShotFacts | null = null;
+  private pendingRelay = false;
+  private lastFallenIds: string[] = [];
   private shotSteps = 0;
   private quietSteps = 0;
   private pausedPhase: GamePhase | null = null;
@@ -30,6 +32,29 @@ export class GameSession {
   }
   get view(): GameView { return structuredClone(this.state); }
   get frame(): WorldFrame { return this.physics.frame; }
+  get lastFallenCoinIds(): readonly string[] { return [...this.lastFallenIds]; }
+  /** Continue from the single settled survivor, keeping cumulative score and relay ownership. */
+  advanceRound(level: LevelConfig): boolean {
+    if (this.disposed || this.state.mode !== 'challenge' || this.state.phase !== 'complete' || this.state.remaining !== 1) return false;
+    const survivor = this.physics.frame.coins[0];
+    if (!survivor || level.activeCoinId !== survivor.id || !this.physics.reconfigure(level)) return false;
+    this.continueRound(level.id, survivor.id, false);
+    return true;
+  }
+  /** App owns the run's revive allowance; Core only accepts a safely settled failed Challenge. */
+  revive(level: LevelConfig): boolean {
+    if (this.disposed || this.state.mode !== 'challenge' || this.state.phase !== 'failed' || !this.physics.reconfigure(level)) return false;
+    this.continueRound(level.id, null, true);
+    return true;
+  }
+  private continueRound(levelId: string, activeCoinId: string | null, canSelectCoin: boolean): void {
+    this.facts = null; this.pendingRelay = false; this.accumulator = 0; this.feedback = []; this.lastFallenIds = [];
+    this.shotSteps = 0; this.quietSteps = 0; this.pausedPhase = null;
+    this.state.levelId = levelId; this.state.activeCoinId = activeCoinId; this.state.canSelectCoin = canSelectCoin;
+    this.state.phase = canSelectCoin ? 'selecting' : 'ready'; this.state.remaining = this.physics.frame.coins.length;
+    this.state.foulReasons = []; this.state.lastResult = null; this.state.error = null; this.state.winner = null;
+    this.state.revision++;
+  }
   /** Consume presentation events exactly once; these never affect shot resolution. */
   drainFeedback(): PhysicsFeedback[] {
     const feedback = this.feedback; this.feedback = [];
@@ -39,7 +64,7 @@ export class GameSession {
     if (this.disposed || this.state.phase !== 'ready' || !this.state.activeCoinId) return false;
     if (!this.physics.applyShot(this.state.activeCoinId, direction, power)) return false;
     this.facts = { sourceCoinId: this.state.activeCoinId, contacts: [], fallenCoinIds: [], timedOut: false };
-    this.shotSteps = 0; this.quietSteps = 0; this.accumulator = 0; this.feedback = [];
+    this.pendingRelay = false; this.shotSteps = 0; this.quietSteps = 0; this.accumulator = 0; this.feedback = [];
     this.state.phase = 'simulating'; this.state.canSelectCoin = false; this.state.shotCount++; this.state.revision++;
     this.state.foulReasons = []; this.state.lastResult = null;
     return true;
@@ -62,7 +87,9 @@ export class GameSession {
         this.feedback.push(...events.feedback);
         // Audio consumers can be muted or absent; prevent an unbounded presentation backlog.
         if (this.feedback.length > 64) this.feedback.splice(0, this.feedback.length - 64);
-        this.facts.contacts.push(...events.contacts);
+        // After a legal settled shot, removing its supporting source may let the
+        // target drop onto the table. These cleanup contacts are not a new shot.
+        if (!this.pendingRelay) this.facts.contacts.push(...events.contacts);
         this.facts.fallenCoinIds.push(...events.fallenCoinIds.filter((id) => !this.facts!.fallenCoinIds.includes(id)));
         const certain = certainFouls(this.facts);
         if (certain.join(',') !== this.state.foulReasons.join(',')) { this.state.foulReasons = certain; this.state.revision++; }
@@ -72,7 +99,7 @@ export class GameSession {
         else if (this.shotSteps >= PHYSICS_CONFIG.maxShotSteps) this.settle(true);
       }
     } catch (error) {
-      this.physics.freeze(); this.facts = null; this.accumulator = 0; this.feedback = [];
+      this.physics.freeze(); this.facts = null; this.pendingRelay = false; this.accumulator = 0; this.feedback = [];
       this.state.phase = 'error'; this.state.error = error instanceof Error ? error.message : String(error); this.state.revision++;
     }
   }
@@ -80,11 +107,25 @@ export class GameSession {
     const facts = this.facts;
     if (!facts) return;
     facts.timedOut = timedOut;
+    this.lastFallenIds = [...facts.fallenCoinIds];
     // Compute support before freezing; frozen velocities alone never prove support.
     const supported = this.physics.allSupported();
     if (timedOut) this.physics.freeze();
     const result = resolveShot(facts);
-    this.facts = null; this.accumulator = 0;
+    if (result.outcome === 'SUCCESS' && !this.pendingRelay && !this.physics.canRemoveSource(result.sourceCoinId)) {
+      if (!this.physics.hasCoin(result.targetCoinId) || !this.physics.releaseSupportingSource(result.sourceCoinId)) {
+        this.physics.freeze(); this.facts = null; this.accumulator = 0;
+        this.state.phase = 'error'; this.state.error = '接力结算支撑异常，未移除当前币或加分。';
+        this.state.revision++; return;
+      }
+      // Rapier now owns a small natural landing. Keep the original valid target,
+      // hold input locked, and defer points/control until the survivor really rests.
+      this.pendingRelay = true; this.quietSteps = 0; this.shotSteps = 0;
+      this.state.activeCoinId = null; this.state.remaining = this.physics.frame.coins.length;
+      this.state.revision++; return;
+    }
+    const sourceAlreadyRemoved = this.pendingRelay;
+    this.facts = null; this.pendingRelay = false; this.accumulator = 0;
     this.state.lastResult = result; this.state.foulReasons = [...result.reasons];
     for (const id of facts.fallenCoinIds) this.physics.removeCoin(id);
     this.state.remaining = this.physics.frame.coins.length;
@@ -93,11 +134,11 @@ export class GameSession {
       this.state.revision++; return;
     }
     if (result.outcome === 'SUCCESS') {
-      if (!this.physics.hasCoin(result.targetCoinId) || !this.physics.canRemoveSource(result.sourceCoinId)) {
+      if (!this.physics.hasCoin(result.targetCoinId) || (sourceAlreadyRemoved ? !supported : !this.physics.canRemoveSource(result.sourceCoinId))) {
         this.physics.freeze(); this.state.phase = 'error'; this.state.error = '接力结算支撑异常，未移除当前币或加分。';
         this.state.revision++; return;
       }
-      this.physics.removeCoin(result.sourceCoinId);
+      if (!sourceAlreadyRemoved) this.physics.removeCoin(result.sourceCoinId);
       this.state.scores[this.state.currentPlayer]++;
       this.state.chain++;
       this.state.activeCoinId = result.targetCoinId;
@@ -131,7 +172,7 @@ export class GameSession {
   }
   dispose(): void {
     if (this.disposed) return;
-    this.disposed = true; this.facts = null; this.accumulator = 0; this.feedback = []; this.physics.dispose();
+    this.disposed = true; this.facts = null; this.pendingRelay = false; this.accumulator = 0; this.feedback = []; this.physics.dispose();
     this.state.phase = 'error'; this.state.canSelectCoin = false; this.state.error = '会话已销毁'; this.state.activeCoinId = null; this.state.remaining = 0; this.state.revision++;
   }
 }

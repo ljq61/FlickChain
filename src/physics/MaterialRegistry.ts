@@ -1,8 +1,9 @@
+import type { CoinMaterialId } from '../types/contracts';
 /** SI units. Shared by rendering, content replays and production physics. */
 export const COIN_RADIUS = 0.035;
 export const COIN_THICKNESS = 0.008;
 export const PHYSICS_CONFIG = Object.freeze({
-  version: 'wood-standard-v2',
+  version: 'campaign-materials-v4',
   fixedDt: 1 / 120,
   maxFrameSeconds: 0.1,
   maxStepsPerFrame: 12,
@@ -11,6 +12,7 @@ export const PHYSICS_CONFIG = Object.freeze({
   integrationSubsteps: 2,
   tableThickness: 0.06,
   obstacleHeight: 0.08,
+  glassHeight: 0.12,
   initialYGap: 0.001,
   initialSettleSteps: 90,
   maxInitialDrift: 0.002,
@@ -37,8 +39,14 @@ export const PHYSICS_CONFIG = Object.freeze({
 });
 export const MATERIALS = Object.freeze({
   standard: Object.freeze({ friction: 0.18, restitution: 0.7, mass: PHYSICS_CONFIG.coinMass }),
+  iron: Object.freeze({ friction: 0.30, restitution: 0.6, mass: 0.021 }),
+  marble: Object.freeze({ friction: 0.055, restitution: 0, obstacleRestitution: 0.7 }),
   wood: Object.freeze({ friction: 0.18, restitution: 0, obstacleRestitution: 0.7 }),
 });
 export function impulseForPower(power: number): number {
   return PHYSICS_CONFIG.maxImpulse * power ** PHYSICS_CONFIG.powerExponent;
+}
+
+export function coinRadius(materialId: CoinMaterialId): number {
+  return COIN_RADIUS * (materialId === 'iron' ? 1.12 : 1);
 }

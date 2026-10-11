@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SoundManager } from '../../src/ui/SoundManager';
+import { jazzLoop } from '../../src/ui/JazzScore';
 
 class Param {
   value = 0;
@@ -229,5 +230,56 @@ describe('SoundManager optional audio and voice lifecycle', () => {
     sound.play('coin', -1);
     expect(context().sources).toHaveLength(0);
     expect(context().oscillators).toHaveLength(0);
+  });
+
+  it('plays one reusable jazz loop after interaction and keeps it independent of impact cancellation', async () => {
+    sound.dispose();
+    sound = new SoundManager(true);
+    expect(Context.instances).toHaveLength(0);
+    sound.unlock();
+    await vi.waitFor(() => expect(context().sources.filter(source => source.loop)).toHaveLength(1));
+    const music = context().sources[0];
+    const buffer = music.buffer;
+    expect(context().gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.16, context().currentTime + 1.4);
+    sound.unlock(); sound.unlock();
+    await new Promise(resolve => setTimeout(resolve, 5));
+    expect(context().sources).toHaveLength(1);
+    sound.stopCurrentSounds();
+    expect(music.stop).not.toHaveBeenCalled();
+    sound.enabled = false;
+    expect(music.stop).toHaveBeenCalledTimes(1);
+    expect(music.disconnect).toHaveBeenCalledTimes(1);
+    sound.enabled = true; sound.unlock();
+    await vi.waitFor(() => expect(context().sources).toHaveLength(2));
+    expect(context().sources[1].buffer).toBe(buffer);
+    sound.suspend();
+    expect(context().sources[1].stop).toHaveBeenCalledTimes(1);
+    expect(context().sources[1].disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels queued music before playback if mute or disposal precedes audio permission', async () => {
+    sound.dispose(); sound = new SoundManager(true);
+    sound.unlock(); sound.enabled = false;
+    await new Promise(resolve => setTimeout(resolve, 5));
+    expect(context().sources).toHaveLength(0);
+    sound.enabled = true; sound.unlock(); sound.dispose();
+    await new Promise(resolve => setTimeout(resolve, 5));
+    expect(context().sources).toHaveLength(0);
+  });
+
+  it('renders quiet tavern accompaniment with a seamless loop and finite samples', () => {
+    const pcm = jazzLoop(8000);
+    let peak = 0, energy = 0, finite = true;
+    for (const sample of pcm) {
+      finite &&= Number.isFinite(sample);
+      peak = Math.max(peak, Math.abs(sample)); energy += sample * sample;
+    }
+    expect(finite).toBe(true);
+    expect(pcm.length).toBe(Math.round(64 * 60 / 66 * 8000));
+    expect(peak).toBeGreaterThan(0.08);
+    expect(peak).toBeLessThan(0.25);
+    expect(energy / pcm.length).toBeGreaterThan(0.0002);
+    expect(energy / pcm.length).toBeLessThan(0.001);
+    expect(Math.abs(pcm[0] - pcm[pcm.length - 1])).toBeLessThan(0.001);
   });
 });

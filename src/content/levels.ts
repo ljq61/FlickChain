@@ -7,4 +7,4 @@ import { validateLevel } from './LevelValidator';
 import type { LevelConfig } from '../types/contracts';
 
 // One JSON source per level, checked at the same boundary as external content.
-export const LEVELS: LevelConfig[] = [firstFlick, distance, corner, zigzag, fullChain].map(validateLevel);
+export const LEVELS: LevelConfig[] = [firstFlick, distance, corner, zigzag, fullChain].map((level) => validateLevel(level));

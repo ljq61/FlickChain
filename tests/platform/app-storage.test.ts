@@ -2,267 +2,288 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameApp } from '../../src/app/GameApp';
 import { LEVELS } from '../../src/content/levels';
-import type { GameMode, GameView, LevelConfig, WorldFrame } from '../../src/types/contracts';
+import type { CoinTransform, GameMode, GameView, LevelConfig, WorldFrame } from '../../src/types/contracts';
 
-// Rendering, hardware input, sound and physics are outside this persistence test.
-// GameApp, Shell, SaveAdapter and the shipped level catalog remain real.
 const harness = vi.hoisted(() => ({
-  sessions: [] as Array<{ view: GameView; frame: WorldFrame; dispose: ReturnType<typeof vi.fn> }>,
+  sessions: [] as Array<{
+    view: GameView; frame: WorldFrame; lastFallenCoinIds: string[];
+    dispose: ReturnType<typeof vi.fn>; advanceRound: ReturnType<typeof vi.fn>; revive: ReturnType<typeof vi.fn>;
+  }>,
   handLoad: vi.fn(async () => {}),
-  arrivalCoins: false,
   inputState: null as null | (() => { view: GameView | null; frame: WorldFrame | null }),
-  play: vi.fn(),
-  stopSounds: vi.fn(),
+  inputCallbacks: null as null | { pickCoin: (id: string) => void; shoot: (direction: { x: number; z: number }, power: number) => void },
+  play: vi.fn(), stopSounds: vi.fn(), suspendSound: vi.fn(), arrivals: [] as string[][],
 }));
 
-vi.mock('../../src/core/GameSession', () => ({
-  GameSession: {
-    create: vi.fn(async (level: LevelConfig, mode: GameMode) => {
-      const session = {
-        view: {
-          sessionId: `storage-test-${harness.sessions.length}`,
-          revision: 0,
-          mode,
-          phase: harness.arrivalCoins ? 'selecting' as const : 'ready' as const,
-          levelId: level.id,
-          activeCoinId: level.activeCoinId,
-          canSelectCoin: true,
-          currentPlayer: 0 as const,
-          scores: [0, 0] as [number, number],
-          remaining: level.coins.length,
-          chain: 0,
-          shotCount: 0,
-          foulReasons: [],
-          lastResult: null,
-          winner: null,
-          error: null,
-        },
-        frame: { coins: harness.arrivalCoins ? level.coins.map(coin => ({ id: coin.id, materialId: 'standard' as const, position: { x: coin.x, y: 0.004, z: coin.z }, rotation: { x: 0, y: 0, z: 0, w: 1 } })) : [], table: level.table, obstacles: level.obstacles },
-        tick: vi.fn(),
-        drainFeedback: () => [],
-        dispose: vi.fn(),
-      };
-      harness.sessions.push(session);
-      return session;
-    }),
-  },
-}));
-
+// App, Shell, generator and storage remain real. Physics and renderer are tested separately.
+vi.mock('../../src/core/GameSession', () => ({ GameSession: {
+  create: vi.fn(async (level: LevelConfig, mode: GameMode) => {
+    const frameFor = (next: LevelConfig, retained: CoinTransform[] = []): WorldFrame => ({
+      table: next.table, obstacles: next.obstacles,
+      coins: next.coins.map(coin => retained.find(item => item.id === coin.id) ?? {
+        id: coin.id, materialId: coin.materialId, position: { x: coin.x, y: 0.004, z: coin.z }, rotation: { x: 0, y: 0, z: 0, w: 1 },
+      }),
+    });
+    let paused: GameView['phase'] = 'selecting';
+    const session = {
+      view: { sessionId: `app-test-${harness.sessions.length}`, revision: 0, mode, phase: 'selecting', levelId: level.id,
+        activeCoinId: null, canSelectCoin: true, currentPlayer: 0, scores: [0, 0], remaining: level.coins.length,
+        chain: 0, shotCount: 0, foulReasons: [], lastResult: null, winner: null, error: null } as GameView,
+      frame: frameFor(level), lastFallenCoinIds: [] as string[],
+      tick: vi.fn(), drainFeedback: () => [], dispose: vi.fn(),
+      selectCoin(id: string) { session.view = { ...session.view, phase: 'ready', activeCoinId: id }; return true; },
+      shoot: vi.fn(() => { session.view.phase = 'simulating'; return true; }),
+      pause() { paused = session.view.phase; session.view.phase = 'paused'; },
+      resume() { session.view.phase = paused; },
+      advanceRound: vi.fn((next: LevelConfig) => {
+        const carry = session.frame.coins[0];
+        session.frame = frameFor(next, session.frame.coins);
+        session.view = { ...session.view, phase: 'ready', levelId: next.id, remaining: next.coins.length, activeCoinId: carry.id, canSelectCoin: false };
+        return true;
+      }),
+      revive: vi.fn((next: LevelConfig) => {
+        session.frame = frameFor(next, session.frame.coins);
+        session.view = { ...session.view, phase: 'selecting', canSelectCoin: true, activeCoinId: null, remaining: next.coins.length, foulReasons: [] };
+        session.lastFallenCoinIds = [];
+        return true;
+      }),
+    };
+    harness.sessions.push(session);
+    return session;
+  }),
+} }));
 vi.mock('../../src/rendering/SceneManager', async () => {
   const { CoinArrival } = await import('../../src/rendering/CoinArrival');
   return { SceneManager: class {
-    arrival = new CoinArrival();
+    arrival = new CoinArrival(); clearing = 0;
     initializeHand = harness.handLoad; setLevel = vi.fn(); render = vi.fn(); focusCoin = vi.fn(); clearFocus = vi.fn(); dispose = vi.fn();
-    beginCoinArrival(ids: string[]) { this.arrival.begin(ids); }
+    beginCoinArrival(ids: string[]) { harness.arrivals.push(ids); this.arrival.begin(ids); }
     advanceCoinArrival(seconds: number) { return this.arrival.advance(seconds); }
     get isIntroducing() { return this.arrival.playing; }
+    beginObstacleRemoval() { this.clearing = 0.6; }
+    advanceObstacleRemoval(seconds: number) { this.clearing = Math.max(0, this.clearing - seconds); }
+    get isRemovingObstacles() { return this.clearing > 0; }
   } };
 });
-vi.mock('../../src/input/PointerInput', () => ({
-  PointerInput: class {
-    constructor(_scene: unknown, getState: typeof harness.inputState) { harness.inputState = getState; }
-    cancel = vi.fn(); dispose = vi.fn(); charge = vi.fn(() => null);
-  },
-}));
-vi.mock('../../src/ui/SoundManager', () => ({
-  SoundManager: class {
-    enabled = true;
-    unlock = vi.fn(); play = harness.play; slide = vi.fn(); stopCurrentSounds = harness.stopSounds; suspend = vi.fn(); dispose = vi.fn();
-  },
-}));
+vi.mock('../../src/input/PointerInput', () => ({ PointerInput: class {
+  constructor(_scene: unknown, getState: typeof harness.inputState, callbacks: typeof harness.inputCallbacks) {
+    harness.inputState = getState; harness.inputCallbacks = callbacks;
+  }
+  cancel = vi.fn(); dispose = vi.fn(); charge = vi.fn(() => null);
+} }));
+vi.mock('../../src/ui/SoundManager', () => ({ SoundManager: class {
+  enabled = true; unlock = vi.fn(); play = harness.play; slide = vi.fn(); stopCurrentSounds = harness.stopSounds; suspend = harness.suspendSound; dispose = vi.fn();
+} }));
 
-describe('app progress recovery and non-blocking save notices', () => {
-  let root: HTMLDivElement;
-  let app: GameApp | undefined;
-  let raf: FrameRequestCallback | undefined;
-  let frameTime: number;
+describe('continuous Challenge app and persistence', () => {
+  let root: HTMLDivElement; let app: GameApp | undefined; let raf: FrameRequestCallback | undefined; let time: number;
   let storage: { getItem: ReturnType<typeof vi.fn>; setItem: ReturnType<typeof vi.fn> };
-
   beforeEach(() => {
-    harness.sessions.length = 0;
-    harness.arrivalCoins = false;
-    harness.inputState = null;
+    harness.sessions.length = 0; harness.arrivals.length = 0; harness.inputState = null; harness.inputCallbacks = null;
     harness.handLoad.mockReset().mockResolvedValue(undefined);
-    frameTime = 0;
-    raf = undefined;
-    root = document.createElement('div');
-    document.body.append(root);
+    time = 0; raf = undefined;
+    root = document.createElement('div'); document.body.append(root);
     storage = { getItem: vi.fn(() => null), setItem: vi.fn() };
     vi.stubGlobal('localStorage', storage);
-    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
-      raf = callback;
-      return 1;
-    }));
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => { raf = callback; return 1; }));
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
+  afterEach(() => { app?.dispose(); app = undefined; root.remove(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
+  function node<T extends HTMLElement = HTMLElement>(selector: string): T {
+    const item = root.querySelector<T>(selector); expect(item, selector).not.toBeNull(); return item!;
+  }
+  function frames(count = 1): void {
+    for (let i = 0; i < count; i++) { const callback = raf!; expect(callback).toBeDefined(); raf = undefined; callback(time += 16); }
+  }
+  async function initialize(): Promise<void> {
+    app = new GameApp(root, () => 0.5); await app.initialize();
+    expect(node('[data-el="loading"]').hidden).toBe(true);
+  }
+  async function start(): Promise<void> {
+    node<HTMLButtonElement>('[data-action="challenge"]').click();
+    await vi.waitFor(() => expect(node('.flick-shell').dataset.screen).toBe('game'));
+    expect(harness.sessions.at(-1)!.frame.coins).toHaveLength(4);
+  }
+  function complete(): CoinTransform {
+    const session = harness.sessions.at(-1)!;
+    const carry = session.frame.coins.at(-1)!;
+    session.frame.coins = [carry];
+    session.view = { ...session.view, phase: 'complete', scores: [session.view.scores[0] + 3, 0], remaining: 1, activeCoinId: carry.id };
+    frames(); return structuredClone(carry);
+  }
+  function fail(fallenCount = 0): void {
+    const session = harness.sessions.at(-1)!;
+    session.lastFallenCoinIds = session.frame.coins.slice(0, fallenCount).map(coin => coin.id);
+    session.frame.coins = session.frame.coins.slice(fallenCount);
+    session.view = { ...session.view, phase: 'failed', foulReasons: fallenCount ? ['FALL'] : ['MISS'], remaining: session.frame.coins.length };
+    frames();
+  }
 
-  afterEach(() => {
-    app?.dispose();
-    app = undefined;
-    root.remove();
-    vi.unstubAllGlobals();
-    vi.clearAllMocks();
+  it('enters four random coins directly and gates input until exactly one landing per new coin', async () => {
+    await initialize(); await start();
+    expect(root.querySelector('[data-level-id]')).toBeNull();
+    expect(harness.inputState!().view).toBeNull();
+    expect(node('[data-el="modal-layer"]').hidden).toBe(true);
+    frames(90);
+    expect(harness.inputState!().view?.phase).toBe('selecting');
+    expect(harness.play.mock.calls.filter(([kind]) => kind === 'land')).toHaveLength(4);
+    frames(30);
+    expect(harness.play.mock.calls.filter(([kind]) => kind === 'land')).toHaveLength(4);
   });
 
-  function element<T extends HTMLElement = HTMLElement>(selector: string): T {
-    const node = root.querySelector<T>(selector);
-    expect(node, selector).not.toBeNull();
-    return node!;
-  }
+  it('suspends background music when either the home screen or game becomes hidden', async () => {
+    await initialize();
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(harness.suspendSound).toHaveBeenCalledTimes(1);
+    hidden.mockReturnValue(false);
+    await start(); frames(90);
+    hidden.mockReturnValue(true);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(harness.suspendSound).toHaveBeenCalledTimes(2);
+    expect(harness.sessions.at(-1)!.view.phase).toBe('paused');
+    hidden.mockRestore();
+  });
 
-  function advanceFrame(): void {
-    expect(raf).toBeDefined();
-    const callback = raf!;
-    raf = undefined;
-    frameTime += 16;
-    callback(frameTime);
-  }
-
-  async function initialize(): Promise<void> {
-    app = new GameApp(root);
-    await app.initialize();
-    expect(element('[data-el="loading"]').hidden).toBe(true);
-  }
-
-  async function startLevel(index = 0): Promise<void> {
-    element<HTMLButtonElement>('[data-action="levels"]').click();
-    const button = element<HTMLButtonElement>(`[data-level-id="${LEVELS[index].id}"]`);
-    expect(button.disabled).toBe(false);
-    button.click();
-    await vi.waitFor(() => {
-      expect(element('.flick-shell').dataset.screen).toBe('game');
-      expect(element('[data-el="level-name"]').textContent).toBe(LEVELS[index].name);
-      expect(element('[data-el="loading"]').hidden).toBe(true);
-    });
-  }
-
-  function completeCurrentLevel(): void {
+  it('automatically carries the last coin and score into seven coins without a success modal or next click', async () => {
+    await initialize(); await start(); frames(90);
     const session = harness.sessions.at(-1)!;
-    session.view = { ...session.view, phase: 'complete', scores: [LEVELS[0].coins.length - 1, 0], remaining: 1 };
-    advanceFrame();
-  }
+    const carry = complete();
+    expect(node('[data-el="modal-layer"]').hidden).toBe(true);
+    expect(harness.inputState!().view).toBeNull();
+    frames(130);
+    expect(session.advanceRound).toHaveBeenCalledTimes(1);
+    expect(session.frame.coins).toHaveLength(7);
+    expect(session.frame.coins.find(coin => coin.id === carry.id)).toEqual(carry);
+    expect(session.view).toMatchObject({ scores: [3, 0], activeCoinId: carry.id, canSelectCoin: false, phase: 'ready' });
+    expect(harness.arrivals.at(-1)).toHaveLength(6);
+    expect(harness.arrivals.at(-1)).not.toContain(carry.id);
+    expect(harness.sessions).toHaveLength(2); // preview plus one persistent campaign session
+    expect(JSON.parse(storage.setItem.mock.calls[0][1])).toMatchObject({ bestScore: 3 });
+  });
 
-  it.each(['boot', 'entry'] as const)('the error rebuild button retries a failed hand load during %s', async (stage) => {
+  it('freezes clearing during pause and returns home without resurrecting a pending round', async () => {
+    await initialize(); await start(); frames(90); complete();
+    const session = harness.sessions.at(-1)!;
+    node<HTMLButtonElement>('[data-action="pause"]').click(); frames(120);
+    expect(session.advanceRound).not.toHaveBeenCalled();
+    node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames(130);
+    expect(session.advanceRound).toHaveBeenCalledTimes(1);
+    complete();
+    const stopped = harness.stopSounds.mock.calls.length;
+    node<HTMLButtonElement>('[data-action="pause"]').click();
+    node<HTMLButtonElement>('[data-action="home"]').click();
+    await vi.waitFor(() => expect(node('.flick-shell').dataset.screen).toBe('home'));
+    frames(120);
+    expect(session.advanceRound).toHaveBeenCalledTimes(1);
+    expect(session.dispose).toHaveBeenCalledTimes(1);
+    expect(harness.stopSounds).toHaveBeenCalledTimes(stopped + 1);
+  });
+
+  it.each(['arriving', 'clearing'] as const)('restarts from settings during paused %s without resuming the old round', async (transition) => {
+    await initialize(); await start();
+    if (transition === 'clearing') { frames(90); complete(); }
+    const old = harness.sessions.at(-1)!;
+    node<HTMLButtonElement>('[data-action="pause"]').click();
+    frames();
+    expect(old.view.phase).toBe('paused');
+    expect(harness.inputState!().view).toBeNull();
+    const restart = node<HTMLButtonElement>('[data-el="modal-secondary"]');
+    expect(restart.dataset.action).toBe('retry');
+    restart.click();
+    await vi.waitFor(() => expect(harness.sessions.at(-1)).not.toBe(old));
+    frames(130);
+    expect(old.dispose).toHaveBeenCalledTimes(1);
+    expect(old.advanceRound).not.toHaveBeenCalled();
+    expect(harness.sessions.at(-1)!.view).toMatchObject({ phase: 'selecting', scores: [0, 0], remaining: 4 });
+    expect(harness.inputState!().view?.phase).toBe('selecting');
+  });
+
+  it.each([0, 2, 4])('uses three revivals, keeps score/poses and replenishes exactly %s fallen coins', async (fallenCount) => {
+    await initialize(); await start(); frames(90);
+    const session = harness.sessions.at(-1)!;
+    session.view.scores = [2, 0]; frames(); fail(fallenCount);
+    const survivors = structuredClone(session.frame.coins);
+    expect(node<HTMLButtonElement>('[data-el="modal-primary"]').dataset.action).toBe('revive');
+    node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames(90);
+    expect(session.revive).toHaveBeenCalledTimes(1);
+    expect(session.frame.coins).toHaveLength(4);
+    for (const coin of survivors) expect(session.frame.coins.find(item => item.id === coin.id)).toEqual(coin);
+    expect(harness.arrivals.at(-1)).toHaveLength(fallenCount);
+    expect(session.view).toMatchObject({ scores: [2, 0], canSelectCoin: true, activeCoinId: null, phase: 'selecting' });
+    expect(node('[data-el="revive-count"]').textContent).toContain('2 次');
+    for (const allowance of [1, 0]) {
+      fail();
+      expect(node<HTMLButtonElement>('[data-el="modal-primary"]').dataset.action).toBe('revive');
+      node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames(90);
+      expect(node('[data-el="revive-count"]').textContent).toContain(`${allowance} 次`);
+    }
+    expect(session.revive).toHaveBeenCalledTimes(3);
+    fail();
+    expect(node<HTMLButtonElement>('[data-el="modal-primary"]').dataset.action).toBe('retry');
+    expect(root.querySelector('[data-action="revive"]')).toBeNull();
+    expect(JSON.parse(storage.setItem.mock.calls[0][1])).toMatchObject({ bestScore: 2 });
+  });
+
+  it('introduces iron and marble exactly in their first campaign round and clears their next-round tips', async () => {
+    await initialize(); await start(); frames(90);
+    expect(node('[data-el="revive-count"]').textContent).toContain('3 次');
+    const next = () => { complete(); frames(180); };
+    next();
+    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('青色铁币');
+    next();
+    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('青色铁币');
+    next();
+    expect(node('[data-el="tutorial-tip"]').textContent).toContain('青色铁币重量和摩擦力更大');
+    next();
+    expect(node('[data-el="tutorial-tip"]').textContent).toContain('大理石桌面比木头桌面更容易滑行，摩擦力更低');
+    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('青色铁币');
+    next();
+    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('大理石桌面');
+  });
+
+  it.each(['boot', 'entry'] as const)('retries a failed hand load at %s without leaving a stale loading gate', async (stage) => {
     if (stage === 'entry') await initialize();
     harness.handLoad.mockRejectedValueOnce(new Error('Hand model request failed (503)'));
-    if (stage === 'boot') {
-      app = new GameApp(root);
-      await app.initialize();
-    } else {
-      element<HTMLButtonElement>('[data-action="levels"]').click();
-      element<HTMLButtonElement>(`[data-level-id="${LEVELS[0].id}"]`).click();
-    }
-    await vi.waitFor(() => expect(element('[data-el="modal-description"]').textContent).toContain('503'));
+    if (stage === 'boot') { app = new GameApp(root); await app.initialize(); }
+    else node<HTMLButtonElement>('[data-action="challenge"]').click();
+    await vi.waitFor(() => expect(node('[data-el="modal-description"]').textContent).toContain('503'));
     const count = harness.handLoad.mock.calls.length;
-    expect(element<HTMLButtonElement>('[data-el="modal-primary"]').dataset.action).toBe('retry');
-    element<HTMLButtonElement>('[data-el="modal-primary"]').click();
-    await vi.waitFor(() => {
-      expect(harness.handLoad).toHaveBeenCalledTimes(count + 1);
-      expect(element('[data-el="loading"]').hidden).toBe(true);
-      expect(element('[data-el="modal-layer"]').hidden).toBe(true);
-      expect(element('.flick-shell').dataset.screen).toBe(stage === 'boot' ? 'home' : 'game');
-    });
-    expect(harness.sessions.at(-1)!.view.levelId).toBe(LEVELS[0].id);
+    node<HTMLButtonElement>('[data-el="modal-primary"]').click();
+    await vi.waitFor(() => expect(harness.handLoad).toHaveBeenCalledTimes(count + 1));
+    await vi.waitFor(() => expect(node('[data-el="modal-layer"]').hidden).toBe(true));
+    expect(node('.flick-shell').dataset.screen).toBe(stage === 'boot' ? 'home' : 'game');
   });
 
-  it('blocks gameplay input during arrival and emits exactly one landing sound per coin before restoring selection', async () => {
+  it.each(['corrupt-json', 'read-security-error'] as const)('%s leaves random play available', async (failure) => {
+    if (failure === 'corrupt-json') storage.getItem.mockReturnValue('{broken');
+    else storage.getItem.mockImplementation(() => { throw new DOMException('blocked', 'SecurityError'); });
     await initialize();
-    harness.arrivalCoins = true;
-    await startLevel();
-    expect(harness.inputState!().view).toBeNull();
-    expect(element('.flick-shell').dataset.phase).toBe('introducing');
-    expect(element('[data-el="prompt-title"]').textContent).toBe('硬币轻落桌面');
-    for (let i = 0; i < 70; i++) advanceFrame();
+    expect(node('[data-el="notice"]').hidden).toBe(false);
+    await start(); frames(90);
     expect(harness.inputState!().view?.phase).toBe('selecting');
-    expect(element('.flick-shell').dataset.phase).toBe('selecting');
-    expect(harness.play.mock.calls.filter(([kind]) => kind === 'land')).toHaveLength(LEVELS[0].coins.length);
-    for (let i = 0; i < 20; i++) advanceFrame();
-    expect(harness.play.mock.calls.filter(([kind]) => kind === 'land')).toHaveLength(LEVELS[0].coins.length);
-    expect(harness.sessions.at(-1)!.view.shotCount).toBe(0);
-    const cleanupCount = harness.stopSounds.mock.calls.length;
-    element<HTMLButtonElement>('[data-action="home"]').click();
-    await vi.waitFor(() => expect(element('.flick-shell').dataset.screen).toBe('home'));
-    expect(harness.stopSounds).toHaveBeenCalledTimes(cleanupCount + 1);
-  });
-
-  it.each(['corrupt-json', 'read-security-error'] as const)('%s keeps first-level play available', async (failure) => {
-    if (failure === 'corrupt-json') storage.getItem.mockReturnValue('{broken-json');
-    else storage.getItem.mockImplementation(() => { throw new DOMException('Storage blocked', 'SecurityError'); });
-
-    await initialize();
-    expect(storage.getItem).toHaveBeenCalledWith('flickchain.progress.v1');
-    expect(element('[data-el="notice"]').hidden).toBe(false);
-    expect(element('[data-el="notice-message"]').textContent).toContain('无法读取');
-    expect(element('[data-el="modal-layer"]').hidden).toBe(true);
-    expect(element<HTMLButtonElement>('[data-el="sound"]').getAttribute('aria-pressed')).toBe('true');
-    await startLevel();
-    advanceFrame();
-    expect(element('.flick-shell').dataset.phase).toBe('ready');
-    expect(element('[data-el="modal-layer"]').hidden).toBe(true);
     expect(storage.setItem).not.toHaveBeenCalled();
   });
 
-  it('quota failure preserves the completed result, unlocks progress in memory and permits the next level', async () => {
-    storage.setItem.mockImplementation(() => { throw new DOMException('Storage full', 'QuotaExceededError'); });
-    await initialize();
-    await startLevel();
-    completeCurrentLevel();
-
+  it('continues the next round after a quota failure and keeps dismissed notices hidden', async () => {
+    storage.setItem.mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError'); });
+    await initialize(); await start(); frames(90); complete();
+    expect(node('[data-el="notice"]').hidden).toBe(false);
+    expect(node('[data-el="notice-message"]').textContent).toContain('未保存');
+    node<HTMLButtonElement>('[data-action="dismiss-notice"]').click(); frames(130);
+    expect(harness.sessions.at(-1)!.advanceRound).toHaveBeenCalledTimes(1);
+    expect(node('[data-el="notice"]').hidden).toBe(true);
     expect(storage.setItem).toHaveBeenCalledTimes(1);
-    const [key, raw] = storage.setItem.mock.calls[0];
-    expect(key).toBe('flickchain.progress.v1');
-    expect(JSON.parse(raw)).toEqual({ schemaVersion: 1, completed: [LEVELS[0].id], sound: true });
-    expect(element('.flick-shell').dataset.phase).toBe('complete');
-    expect(element('[data-el="modal-title"]').textContent).toBe('接力完成！');
-    expect(element('[data-el="notice"]').hidden).toBe(false);
-    expect(element('[data-el="notice-message"]').textContent).toContain('未保存');
-    expect(element<HTMLButtonElement>('[data-el="modal-primary"]').dataset.action).toBe('next');
-    expect(document.activeElement).toBe(element('[data-el="modal-primary"]'));
-
-    advanceFrame();
-    expect(storage.setItem).toHaveBeenCalledTimes(1);
-    element<HTMLButtonElement>('[data-el="modal-primary"]').click();
-    await vi.waitFor(() => expect(element('[data-el="level-name"]').textContent).toBe(LEVELS[1].name));
-    expect(element('.flick-shell').dataset.phase).toBe('ready');
-    expect(element('[data-el="modal-layer"]').hidden).toBe(true);
-
-    element<HTMLButtonElement>('[data-action="home"]').click();
-    await vi.waitFor(() => expect(element('.flick-shell').dataset.screen).toBe('home'));
-    element<HTMLButtonElement>('[data-action="levels"]').click();
-    expect(element<HTMLButtonElement>(`[data-level-id="${LEVELS[0].id}"]`).dataset.status).toBe('complete');
-    expect(element<HTMLButtonElement>(`[data-level-id="${LEVELS[1].id}"]`).disabled).toBe(false);
+    expect(node('[data-el="modal-layer"]').hidden).toBe(true);
   });
 
-  it('dismisses a save notice across subsequent frames and level loads without closing the result', async () => {
-    storage.setItem.mockImplementation(() => { throw new DOMException('Storage full', 'QuotaExceededError'); });
+  it('migrates old completed levels as preferences and shows the stored local best without selection', async () => {
+    storage.getItem.mockReturnValue(JSON.stringify({ schemaVersion: 1, completed: [LEVELS[2].id], sound: false, bestScore: 21 }));
     await initialize();
-    await startLevel();
-    completeCurrentLevel();
-    element<HTMLButtonElement>('[data-action="dismiss-notice"]').click();
-    expect(element('[data-el="notice"]').hidden).toBe(true);
-    expect(element('[data-el="modal-layer"]').hidden).toBe(false);
-    expect(element('[data-el="modal-title"]').textContent).toBe('接力完成！');
-    advanceFrame();
-    expect(element('[data-el="notice"]').hidden).toBe(true);
-    element<HTMLButtonElement>('[data-el="modal-primary"]').click();
-    await vi.waitFor(() => expect(element('[data-el="level-name"]').textContent).toBe(LEVELS[1].name));
-    expect(element('[data-el="notice"]').hidden).toBe(true);
-  });
-
-  it('replays an already completed later level when its prerequisite is missing from the save', async () => {
-    storage.getItem.mockReturnValue(JSON.stringify({ schemaVersion: 1, completed: [LEVELS[2].id], sound: false }));
-    await initialize();
-    expect(element<HTMLButtonElement>('[data-el="sound"]').getAttribute('aria-pressed')).toBe('false');
-    expect(element<HTMLButtonElement>(`[data-level-id="${LEVELS[1].id}"]`).disabled).toBe(true);
-    const completedButton = element<HTMLButtonElement>(`[data-level-id="${LEVELS[2].id}"]`);
-    expect(completedButton.dataset.status).toBe('complete');
-    expect(completedButton.getAttribute('aria-label')).toContain('可重玩');
-
-    await startLevel(2);
-    advanceFrame();
-    expect(element('.flick-shell').dataset.phase).toBe('ready');
-    expect(harness.sessions.at(-1)!.view.levelId).toBe(LEVELS[2].id);
-    expect(element('[data-el="notice"]').hidden).toBe(true);
+    expect(node('[data-el="progress"]').textContent).toContain('21');
+    expect(node<HTMLButtonElement>('[data-el="sound"]').getAttribute('aria-pressed')).toBe('false');
+    await start(); frames(90);
+    expect(root.querySelector('[data-level-id]')).toBeNull();
     expect(storage.setItem).not.toHaveBeenCalled();
   });
 });

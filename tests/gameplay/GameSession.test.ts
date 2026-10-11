@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GameSession } from '../../src/core/GameSession';
 import { PhysicsWorld } from '../../src/physics/PhysicsWorld';
-import { PHYSICS_CONFIG } from '../../src/physics/MaterialRegistry';
+import type RAPIER from '@dimforge/rapier3d-compat';
+import { COIN_THICKNESS, PHYSICS_CONFIG } from '../../src/physics/MaterialRegistry';
 import type { LevelConfig } from '../../src/types/contracts';
 function level(coins: [string, number, number][] = [['A', -0.18, 0], ['B', 0.12, 0]]): LevelConfig {
   return { schemaVersion: 1, id: 'test', name: 'test', lesson: 'test', table: { width: 1.2, depth: 1.6, materialId: 'wood' }, coins: coins.map(([id, x, z]) => ({ id, x, z, materialId: 'standard' })), activeCoinId: 'A', obstacles: [] };
@@ -180,6 +181,147 @@ describe('production physics and session lifecycle', () => {
       pending[action](); expect(pending.drainFeedback()).toEqual([]);
       pending.tick(1); expect(pending.drainFeedback()).toEqual([]);
     }
+  });
+  it('commits a legal real-contact shot when A rests stacked on B, and B can continue', async () => {
+    const game = await session(level([['A', -.22, 0], ['B', 0, 0], ['C', -.35, .4]]));
+    const physics = (game as unknown as { physics: PhysicsWorld }).physics;
+    const bindings = (physics as unknown as { coins: Map<string, { body: RAPIER.RigidBody }> }).coins;
+    expect(game.shoot({ x: 1, z: 0 }, .6)).toBe(true);
+    let hit = false;
+    for (let i = 0; i < 120 && !hit; i++) {
+      game.tick(PHYSICS_CONFIG.fixedDt);
+      hit = game.drainFeedback().includes('coin');
+    }
+    expect(hit).toBe(true);
+    expect(game.view).toMatchObject({ phase: 'simulating', scores: [0, 0], remaining: 3 });
+    // Reconstruct the observed stacked end pose in the production Rapier bodies,
+    // after an actual source hit. No contact or settlement method is mocked.
+    const a = bindings.get('A')!.body, b = bindings.get('B')!.body;
+    const bp = b.translation();
+    a.setTranslation({ x: bp.x, y: bp.y + COIN_THICKNESS + .002, z: bp.z }, true);
+    a.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+    for (const body of [a, b]) {
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
+    const remove = physics.removeCoin.bind(physics);
+    let beforeRemoval: typeof game.frame.coins = [];
+    vi.spyOn(physics, 'removeCoin').mockImplementation((id) => {
+      beforeRemoval = structuredClone(game.frame.coins.filter((coin) => coin.id !== id));
+      remove(id);
+    });
+    finish(game);
+    expect(game.view).toMatchObject({ phase: 'ready', scores: [1, 0], activeCoinId: 'B', chain: 1, remaining: 2 });
+    expect(game.view.foulReasons).toEqual([]);
+    expect(game.frame.coins.find((coin) => coin.id === 'A')).toBeUndefined();
+    expect(game.frame.coins).toEqual(beforeRemoval);
+    expect(game.selectCoin('C')).toBe(false);
+    const retainedB = structuredClone(game.frame.coins.find((coin) => coin.id === 'B')!);
+    game.tick(1); expect(game.frame.coins.find((coin) => coin.id === 'B')).toEqual(retainedB);
+    expect(game.shoot({ x: -1, z: 0 }, .2)).toBe(true);
+    game.tick(PHYSICS_CONFIG.fixedDt);
+    expect(game.frame.coins.find((coin) => coin.id === 'B')!.position.x).toBeLessThan(retainedB.position.x);
+  });
+  it.each(['challenge', 'battle'] as const)('lands B safely before committing a relay when source A supports it in %s', async (mode) => {
+    const game = await session(level([['A', -.22, 0], ['B', 0, 0], ['C', -.35, .4]]), mode);
+    const physics = (game as unknown as { physics: PhysicsWorld }).physics;
+    const bindings = (physics as unknown as { coins: Map<string, { body: RAPIER.RigidBody }> }).coins;
+    game.shoot({ x: 1, z: 0 }, .6);
+    let hit = false;
+    for (let i = 0; i < 120 && !hit; i++) { game.tick(PHYSICS_CONFIG.fixedDt); hit = game.drainFeedback().includes('coin'); }
+    expect(hit).toBe(true);
+    const a = bindings.get('A')!.body, b = bindings.get('B')!.body;
+    const ap = a.translation();
+    b.setTranslation({ x: ap.x, y: ap.y + COIN_THICKNESS + .002, z: ap.z }, true);
+    for (const body of [a, b]) {
+      body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
+    for (let i = 0; i < 600 && physics.hasCoin('A'); i++) game.tick(PHYSICS_CONFIG.fixedDt);
+    expect(physics.hasCoin('A')).toBe(false);
+    expect(game.view).toMatchObject({ phase: 'simulating', activeCoinId: null, scores: [0, 0], remaining: 2, lastResult: null, currentPlayer: 0 });
+    const pending = game.frame;
+    const pendingB = pending.coins.find((coin) => coin.id === 'B')!;
+    expect(pendingB.position.y).toBeGreaterThan(COIN_THICKNESS / 2 + .003);
+    expect(game.shoot({ x: -1, z: 0 }, .2)).toBe(false);
+    expect(game.selectCoin('B')).toBe(false);
+    game.pause(); game.tick(100); expect(game.frame).toEqual(pending);
+    game.resume(); expect(game.view.phase).toBe('simulating');
+    game.tick(PHYSICS_CONFIG.fixedDt);
+    expect(game.frame.coins.find((coin) => coin.id === 'B')!.position.y).toBeLessThan(pendingB.position.y);
+    finish(game);
+    expect(game.view).toMatchObject({ phase: 'ready', activeCoinId: 'B', scores: [1, 0], chain: 1, remaining: 2, currentPlayer: 0 });
+    expect(game.view.foulReasons).toEqual([]);
+    expect(physics.isSettled()).toBe(true);
+    const landedB = game.frame.coins.find((coin) => coin.id === 'B')!;
+    expect(landedB.position.y).toBeLessThan(COIN_THICKNESS / 2 + .002);
+    expect(landedB.position.x).toBeCloseTo(pendingB.position.x, 5);
+    expect(landedB.position.z).toBeCloseTo(pendingB.position.z, 5);
+    expect(game.frame.coins.find((coin) => coin.id === 'C')!.position.x).toBe(pending.coins.find((coin) => coin.id === 'C')!.position.x);
+    expect(game.shoot({ x: -1, z: 0 }, .2)).toBe(true);
+    game.tick(PHYSICS_CONFIG.fixedDt);
+    expect(game.frame.coins.find((coin) => coin.id === 'B')!.position.x).toBeLessThan(landedB.position.x);
+  });
+  it('keeps cleanup motion subject to TIMEOUT without awarding the pending point', async () => {
+    const game = await session(level([['A', -.22, 0], ['B', 0, 0], ['C', -.35, .4]]));
+    const physics = (game as unknown as { physics: PhysicsWorld }).physics;
+    const bindings = (physics as unknown as { coins: Map<string, { body: RAPIER.RigidBody }> }).coins;
+    game.shoot({ x: 1, z: 0 }, .6);
+    let hit = false;
+    for (let i = 0; i < 120 && !hit; i++) { game.tick(PHYSICS_CONFIG.fixedDt); hit = game.drainFeedback().includes('coin'); }
+    expect(hit).toBe(true);
+    const a = bindings.get('A')!.body, b = bindings.get('B')!.body, ap = a.translation();
+    b.setTranslation({ x: ap.x, y: ap.y + COIN_THICKNESS + .002, z: ap.z }, true);
+    for (const body of [a, b]) { body.setLinvel({ x: 0, y: 0, z: 0 }, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
+    for (let i = 0; i < 600 && physics.hasCoin('A'); i++) game.tick(PHYSICS_CONFIG.fixedDt);
+    expect(game.view).toMatchObject({ phase: 'simulating', scores: [0, 0] });
+    for (let i = 0; i < PHYSICS_CONFIG.maxShotSteps && game.view.phase === 'simulating'; i++) {
+      b.setAngvel({ x: 0, y: 3, z: 0 }, true); game.tick(PHYSICS_CONFIG.fixedDt);
+    }
+    expect(game.view).toMatchObject({ phase: 'failed', scores: [0, 0], remaining: 2, foulReasons: ['TIMEOUT'] });
+  });
+  it.each(['challenge', 'battle'] as const)('preserves a real cleanup fall as a foul in %s', async (mode) => {
+    const game = await session(level([['A', -.22, 0], ['B', 0, 0], ['C', -.35, .4]]), mode);
+    const physics = (game as unknown as { physics: PhysicsWorld }).physics;
+    const bindings = (physics as unknown as { coins: Map<string, { body: RAPIER.RigidBody }> }).coins;
+    game.shoot({ x: 1, z: 0 }, .6);
+    let hit = false;
+    for (let i = 0; i < 120 && !hit; i++) { game.tick(PHYSICS_CONFIG.fixedDt); hit = game.drainFeedback().includes('coin'); }
+    expect(hit).toBe(true);
+    const a = bindings.get('A')!.body, b = bindings.get('B')!.body, ap = a.translation();
+    b.setTranslation({ x: ap.x, y: ap.y + COIN_THICKNESS + .002, z: ap.z }, true);
+    for (const body of [a, b]) { body.setLinvel({ x: 0, y: 0, z: 0 }, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
+    for (let i = 0; i < 600 && physics.hasCoin('A'); i++) game.tick(PHYSICS_CONFIG.fixedDt);
+    expect(physics.hasCoin('A')).toBe(false);
+    expect(game.view).toMatchObject({ phase: 'simulating', scores: [0, 0] });
+    // Actual Rapier motion crosses the rim during the pending landing; the
+    // already-valid hit never grants permission to ignore this physical fall.
+    b.applyImpulse({ x: .048, y: 0, z: 0 }, true);
+    finish(game);
+    expect(game.view).toMatchObject({ phase: mode === 'challenge' ? 'failed' : 'complete', scores: [0, 0], remaining: 1 });
+    expect(game.view.foulReasons).toEqual(['FALL']);
+    expect(game.lastFallenCoinIds).toEqual(['B']);
+    expect(game.frame.coins.map((coin) => coin.id)).toEqual(['C']);
+  });
+  it('still times out a genuinely moving supported board after a legal target hit', async () => {
+    const game = await session(level([['A', -.22, 0], ['B', 0, 0], ['C', -.35, .4]]));
+    const physics = (game as unknown as { physics: PhysicsWorld }).physics;
+    const bindings = (physics as unknown as { coins: Map<string, { body: RAPIER.RigidBody }> }).coins;
+    game.shoot({ x: 1, z: 0 }, .6);
+    let hit = false;
+    for (let i = 0; i < 120 && !hit; i++) { game.tick(PHYSICS_CONFIG.fixedDt); hit = game.drainFeedback().includes('coin'); }
+    expect(hit).toBe(true);
+    const a = bindings.get('A')!.body;
+    // Sustain real angular motion each physics frame. allSupported stays true;
+    // this must not turn the timeout into a valid relay or hide it by freezing first.
+    for (let i = 0; i < PHYSICS_CONFIG.maxShotSteps && game.view.phase === 'simulating'; i++) {
+      a.setAngvel({ x: 0, y: 3, z: 0 }, true);
+      game.tick(PHYSICS_CONFIG.fixedDt);
+    }
+    expect(game.view).toMatchObject({ phase: 'failed', scores: [0, 0], remaining: 3 });
+    expect(game.view.foulReasons).toEqual(['TIMEOUT']);
+    expect(game.frame.coins.some((coin) => coin.id === 'A')).toBe(true);
   });
   it('does not partially commit a relay whose fixed support precheck fails', async () => {
     const game = await session();

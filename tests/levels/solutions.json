@@ -2,8 +2,8 @@
   {
     "levelId": "first-flick",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v2",
-    "configFingerprint": "c74ab82ba2ab448c1f694c12635ac0c36746f32bdc6136f67c2cd7a1ea778f51",
+    "configVersion": "campaign-materials-v4",
+    "configFingerprint": "b46fb1723c0f2d3d8056042b5351ea20481767a277a08d8e10a820629428fca0",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -19,8 +19,8 @@
   {
     "levelId": "distance",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v2",
-    "configFingerprint": "f8d51f986314c6d0ab2f06c18e9ee2e2cb8d601697d36309f125a25dab04ac3f",
+    "configVersion": "campaign-materials-v4",
+    "configFingerprint": "781f42abf89f3191d0d690e61b5b10810f5e005cb14de9914070ff5f36a7330c",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -36,8 +36,8 @@
   {
     "levelId": "turn-the-corner",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v2",
-    "configFingerprint": "612bf5909394d591379e45d28a4ade8cb09e0b0f0ad5b2c93a564b4ec7aa0cc3",
+    "configVersion": "campaign-materials-v4",
+    "configFingerprint": "dcffd07fda8827b6626e20e0a7718ed343c05fa69a6e54d917b8ca4bdc836587",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -62,8 +62,8 @@
   {
     "levelId": "zigzag",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v2",
-    "configFingerprint": "ce092d1c07b2042800d792d2a99dae5e2bad8efdbe7d7023d8bd110e1dbff485",
+    "configVersion": "campaign-materials-v4",
+    "configFingerprint": "17cfe298ab0d467f9f460bba1ffb9b5f554ec584097def71c0b6ecfa91631a22",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -97,8 +97,8 @@
   {
     "levelId": "full-chain",
     "schemaVersion": 1,
-    "configVersion": "wood-standard-v2",
-    "configFingerprint": "9549bf2f67f59478642339724260d5ec7f897a2100efa44b8666ae979bf73143",
+    "configVersion": "campaign-materials-v4",
+    "configFingerprint": "f0d33aa06394ef20e6df6216217bc68478ced1af6ecaaa57ba28eca922c75f68",
     "shots": [
       {
         "sourceCoinId": "a",

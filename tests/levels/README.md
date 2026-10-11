@@ -1,10 +1,13 @@
 # MVP level evidence
 
-The production entrypoint is `src/content/levels.ts`; its only layout sources are
-the five JSON files in `public/levels/`. `validateLevel` is also invoked by
-`PhysicsWorld.create` before simulation. Schema 1 implicitly uses metres, wood,
-standard coins and the Challenge CLEAR_ALL objective. The five delivered stages
-use `table.shape: "circle"` and `width = depth = 1.6` metres (the diameter).
+Single-player content now comes from src/content/CampaignGenerator.ts: randomized
+continuous rounds, one retained coin, recipe-specific new coins/cups and revival
+replenishment. The five JSON layouts exported by src/content/levels.ts are retained
+for local Battle and fixed-layout production regression, not a single-player menu.
+validateLevel is invoked by PhysicsWorld.create/reconfigure. Schema 1 uses metres,
+standard/iron coins, wood/marble tables and CLEAR_ALL. The circular table diameter
+is 1.6 m. New coins require full-radius clearance; retained real terminal coins
+only require their centre to remain inside. Glass obstacles use circular footprints.
 Omitting `shape` preserves legacy rectangular fixtures. The shared pure-math
 `TableGeometry` checks radial clearance for circles; production Rapier uses a
 real cylinder with its top at Y=0. Coins require their full radius and initial
@@ -44,9 +47,24 @@ opt-in generator test was skipped in normal acceptance. Complete solutions used
 1, 1, 2, 3 and 4 shots respectively, with powers from 0.4 to 0.5. Candidate counts
 were 3, 5, 9, 15 and 18; search took about 1.25 seconds in the local Node run.
 The complete inputs and configuration fingerprints were explicitly regenerated
-through production Rapier for `wood-standard-v2`: maximum impulse 0.048 N·s,
+through production Rapier for `campaign-materials-v3`: maximum impulse 0.048 N·s,
 120 Hz fixed gameplay steps and two 240 Hz integration substeps per fixed step.
 The level layouts were unchanged. Every submitted stage also
 passed the production 90-step initial stabilization. These figures describe this
 local run only. Browser mouse/touch control, phone performance, perceived
 difficulty and cross-device replay behavior require separate acceptance.
+
+Later on 2026-10-11, the whiskey-glass change moved the shared configuration to
+`campaign-materials-v4`: glass height is 0.12 m, with the collider's hidden base
+extended into the tabletop to close the high-speed cap seam. The visible radius
+and top height stay unchanged. Explicit production regeneration took about
+1.33 seconds; all five complete semantic input sequences and candidate counts
+were unchanged. The new version and fingerprints are recorded in solutions.json.
+
+Random campaign acceptance is in campaign-generator.test.ts: 1000 recipe/geometry
+layouts, 50 stabilized production worlds, bounded unusual RNGs, near-edge retained
+iron, exact revival replacement counts and a fixed production opening replay for
+the formerly unreachable edge-iron seed. The first new target is 0.20–0.55 m from
+the carry coin and its corridor stays clear. This is not a proof that every
+randomized complete chain is solvable. Tests accept an injected RNG; no persistent
+runtime seed or whole-run replay is currently recorded.

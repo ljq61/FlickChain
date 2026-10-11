@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PhysicsWorld, type PhysicsFeedback } from '../../src/physics/PhysicsWorld';
+import type RAPIER from '@dimforge/rapier3d-compat';
 import { COIN_THICKNESS } from '../../src/physics/MaterialRegistry';
 import type { LevelConfig } from '../../src/types/contracts';
 export function level(coins: [string, number, number][] = [['A', -0.18, 0], ['B', 0.12, 0]]): LevelConfig {
@@ -126,6 +127,33 @@ describe('real Rapier 3D world', () => {
       expect(rectangle.hasCoin('A')).toBe(true); expect(rectangle.isSettled()).toBe(true);
       expect(rectangle.frame.coins[0].position.y).toBeCloseTo(COIN_THICKNESS / 2, 2);
     } finally { circle.dispose(); rectangle.dispose(); }
+  });
+  it('settles a real Rapier coin stack via upward contacts, and removes only a safe top source', async () => {
+    const world = await PhysicsWorld.create(level());
+    try {
+      const bindings = (world as unknown as { coins: Map<string, { body: RAPIER.RigidBody }> }).coins;
+      const a = bindings.get('A')!.body, b = bindings.get('B')!.body;
+      const base = b.translation();
+      a.setTranslation({ x: base.x, y: base.y + COIN_THICKNESS + .05, z: base.z }, true);
+      a.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      a.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      // An airborne pose is never supported merely because it lies above another coin.
+      world.step(); // Refresh contact manifolds after constructing the pose.
+      expect(world.allSupported()).toBe(false);
+      for (let i = 0; i < 240; i++) world.step();
+      expect(a.translation().y - b.translation().y).toBeGreaterThan(COIN_THICKNESS * .7);
+      expect(a.translation().y - b.translation().y).toBeLessThan(COIN_THICKNESS * 1.2);
+      expect(world.isSettled()).toBe(true);
+      expect(world.canRemoveSource('A')).toBe(true);
+      expect(world.canRemoveSource('B')).toBe(false);
+      const retained = { position: { ...b.translation() }, rotation: { ...b.rotation() } };
+      world.removeCoin('A');
+      expect(world.frame.coins).toHaveLength(1);
+      expect(world.frame.coins[0]).toMatchObject(retained);
+      expect(world.applyShot('B', { x: -1, z: 0 }, .3)).toBe(true);
+      const before = b.translation().x;
+      world.step(); expect(b.translation().x).toBeLessThan(before);
+    } finally { world.dispose(); }
   });
   it('rejects overlapping, invalid and dangerous initial layouts', async () => {
     await expect(PhysicsWorld.create(level([['A', 0, 0], ['B', 0.02, 0]]))).rejects.toThrow(/重叠|相交/);

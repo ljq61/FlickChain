@@ -2,9 +2,11 @@ export interface SaveData {
   schemaVersion: 1;
   completed: string[];
   sound: boolean;
+  bestScore: number;
 }
 type SaveStorage = Pick<Storage, 'getItem' | 'setItem'>;
 const KEY = 'flickchain.progress.v1';
+const safeScore = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 
 export class SaveAdapter {
   private storage: SaveStorage | null;
@@ -24,7 +26,7 @@ export class SaveAdapter {
   read(): SaveData {
     try {
       const raw = this.storage?.getItem(KEY);
-      if (!raw) return { schemaVersion: 1, completed: [], sound: true };
+      if (!raw) return { schemaVersion: 1, completed: [], sound: true, bestScore: 0 };
       const value: unknown = JSON.parse(raw);
       if (!value || typeof value !== 'object') throw new Error('Invalid save');
       const data = value as Partial<SaveData>;
@@ -35,10 +37,11 @@ export class SaveAdapter {
         schemaVersion: 1,
         completed: [...new Set(data.completed.filter((id): id is string => typeof id === 'string' && this.knownIds.has(id)))],
         sound: data.sound,
+        bestScore: safeScore(data.bestScore),
       };
     } catch {
       this.lastError = '旧进度无法读取，已恢复默认设置。';
-      return { schemaVersion: 1, completed: [], sound: true };
+      return { schemaVersion: 1, completed: [], sound: true, bestScore: 0 };
     }
   }
 
@@ -49,6 +52,7 @@ export class SaveAdapter {
         schemaVersion: 1,
         completed: [...new Set(data.completed.filter(id => this.knownIds.has(id)))],
         sound: data.sound,
+        bestScore: safeScore(data.bestScore),
       };
       this.storage.setItem(KEY, JSON.stringify(safe));
       this.lastError = null;

@@ -3,14 +3,18 @@ export type Quaternion = { x: number; y: number; z: number; w: number };
 export type Direction = { x: number; z: number };
 export type GameMode = 'challenge' | 'battle';
 export type GamePhase = 'ready' | 'selecting' | 'simulating' | 'failed' | 'complete' | 'paused' | 'error';
+export type CoinMaterialId = 'standard' | 'iron';
+export type TableMaterialId = 'wood' | 'marble';
 
 export interface CoinConfig {
   id: string;
   x: number;
   z: number;
-  materialId: 'standard';
+  materialId: CoinMaterialId;
 }
 export interface ObstacleConfig {
+  /** Omitted kind retains legacy rectangular obstacles. Glass uses a solid cylindrical footprint. */
+  kind?: 'box' | 'glass';
   id: string;
   x: number;
   z: number;
@@ -21,7 +25,7 @@ export interface ObstacleConfig {
 export interface TableConfig {
   width: number;
   depth: number;
-  materialId: 'wood';
+  materialId: TableMaterialId;
   /** Missing shape preserves legacy rectangular content. Circle uses width=depth=diameter. */
   shape?: 'rectangle' | 'circle';
 }
@@ -37,7 +41,7 @@ export interface LevelConfig {
 }
 export interface CoinTransform {
   id: string;
-  materialId: 'standard';
+  materialId: CoinMaterialId;
   position: Vec3;
   rotation: Quaternion;
 }
@@ -79,4 +83,14 @@ export interface AimPreview {
   source: Vec3;
   direction: Direction;
   power: number;
+}
+
+/** Continuous Challenge presentation metadata. Round zero is the home/battle surface. */
+export interface CampaignView {
+  round: number;
+  score: number;
+  bestScore: number;
+  revivesRemaining: number;
+  transition: 'clearing' | 'arriving' | null;
+  tutorial?: string;
 }

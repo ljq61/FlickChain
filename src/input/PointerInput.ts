@@ -1,4 +1,4 @@
-import { COIN_RADIUS } from '../physics/MaterialRegistry';
+import { coinRadius } from '../physics/MaterialRegistry';
 import { tableContainsPoint } from '../physics/TableGeometry';
 import type { SceneManager } from '../rendering/SceneManager';
 import type { Direction, GameView, Vec3, WorldFrame } from '../types/contracts';
@@ -8,6 +8,7 @@ const MIN_HIT_RADIUS = 22;
 const FINGER_HIT_RADIUS = 40;
 const FINGER_MIN_FIRE_MS = 160;
 const FULL_CHARGE_MS = 1250;
+const MAX_CHARGE_HOLD_MS = FULL_CHARGE_MS + 2000;
 
 /** Power ramps with hold duration; the finger curl and tremble behind the coin visualize it. */
 export function chargePower(elapsedMs: number): number {
@@ -55,6 +56,7 @@ export class PointerInput {
     private readonly callbacks: {
       shoot: (direction: Direction, power: number) => void;
       pickCoin: (id: string) => void;
+      chargeFailed?: () => void;
     },
   ) {
     const signal = this.events.signal;
@@ -91,8 +93,10 @@ export class PointerInput {
     const gesture = this.gesture;
     if (!gesture || gesture.kind !== 'shot') return null;
     const { view, frame } = this.getState();
-    if (!view || !frame || !this.valid(gesture)) return null;
-    return { source: gesture.source, elapsedMs: performance.now() - gesture.startedAt };
+    if (!view || !frame || !this.valid(gesture)) { this.cancel(); return null; }
+    const elapsedMs = performance.now() - gesture.startedAt;
+    if (this.expireCharge(gesture, elapsedMs)) return null;
+    return { source: gesture.source, elapsedMs };
   }
 
   private begin(event: PointerEvent): void {
@@ -133,8 +137,10 @@ export class PointerInput {
     let nearestDistance = Infinity;
     for (const coin of candidates) {
       const center = this.scene.projectToScreen(coin.position);
-      const edge = this.scene.projectToScreen({ ...coin.position, x: coin.position.x + COIN_RADIUS });
-      const hitRadius = Math.max(MIN_HIT_RADIUS, Math.abs(edge.x - center.x) * 1.4);
+      const radius = coinRadius(coin.materialId);
+      const edgeX = this.scene.projectToScreen({ ...coin.position, x: coin.position.x + radius });
+      const edgeZ = this.scene.projectToScreen({ ...coin.position, z: coin.position.z + radius });
+      const hitRadius = Math.max(MIN_HIT_RADIUS, Math.hypot(edgeX.x - center.x, edgeX.y - center.y) * 1.4, Math.hypot(edgeZ.x - center.x, edgeZ.y - center.y) * 1.4);
       const distance = Math.hypot(center.x - clientX, center.y - clientY);
       if (distance <= hitRadius && distance < nearestDistance) { nearest = coin; nearestDistance = distance; }
     }
@@ -182,12 +188,25 @@ export class PointerInput {
     this.move(event);
     if (!this.gesture) return;
     const finished = this.gesture;
+    // Release also checks the deadline: a stalled animation frame must not fire an expired hold.
+    if (finished.kind === 'shot' && this.expireCharge(finished, performance.now() - finished.startedAt)) return;
     this.cancel();
     if (finished.kind === 'select') this.callbacks.pickCoin(finished.coinId);
     else if (finished.kind === 'shot') {
       const elapsed = performance.now() - finished.startedAt;
       if (elapsed >= FINGER_MIN_FIRE_MS) this.callbacks.shoot(this.scene.getAimDirection(), chargePower(elapsed));
     }
+  }
+
+  private expireCharge(gesture: ShotGesture, elapsedMs: number): boolean {
+    if (elapsedMs < MAX_CHARGE_HOLD_MS) return false;
+    // Keep the physical pointer registered until release, but give up its gesture
+    // and capture. Movement cannot turn this failed hold into orbit or selection.
+    if (this.gesture === gesture) {
+      this.cancel();
+      this.callbacks.chargeFailed?.();
+    }
+    return true;
   }
 
   cancel(): void {

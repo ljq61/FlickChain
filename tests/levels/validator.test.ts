@@ -84,4 +84,36 @@ describe('level validation', () => {
     level.table.shape = 'circle'; level.obstacles[0].x = 0.3; level.obstacles[0].z = -0.3;
     expect(() => validateLevel(level)).not.toThrow();
   });
+  it('validates iron radius, marble, round glass footprints and strict obstacle kinds', () => {
+    const level = sample(); level.table.materialId = 'marble'; level.coins[0].materialId = 'iron';
+    level.obstacles = [{ id: 'cup', kind: 'glass', x: 0, z: -0.3, width: 0.14, depth: 0.14 }];
+    expect(validateLevel(level)).toEqual(level);
+    const malformed = structuredClone(level); malformed.obstacles[0].depth = 0.15;
+    expect(() => validateLevel(malformed)).toThrow(/相同直径/);
+    expect(() => validateLevel({ ...level, obstacles: [{ ...level.obstacles[0], kind: 'cone' }] })).toThrow(/种类/);
+    // A circle fits here although the circumscribed square's corners would not fit.
+    level.obstacles[0] = { id: 'cup', kind: 'glass', x: 0.68, z: 0, width: 0.2, depth: 0.2 };
+    expect(() => validateLevel(level)).not.toThrow();
+    level.obstacles[0].x = 0.71; expect(() => validateLevel(level)).toThrow(/越界/);
+    level.obstacles = [{ id: 'cup', kind: 'glass', x: 0, z: 0, width: 0.14, depth: 0.14 }];
+    level.coins[0].x = 0.078; level.coins[0].z = 0.078;
+    expect(() => validateLevel(level)).toThrow(/重叠/); // Iron needs a little more clearance.
+    level.coins[0].materialId = 'standard'; expect(() => validateLevel(level)).not.toThrow();
+    level.obstacles.push({ id: 'cup2', kind: 'glass', x: 0.13, z: 0, width: 0.14, depth: 0.14 });
+    expect(() => validateLevel(level)).toThrow(/重叠/);
+  });
+  it('permits only explicit retained COM edge positions and retained existing contacts', () => {
+    const level = sample(); level.coins[0].x = 0.78; level.coins[0].z = 0;
+    expect(() => validateLevel(level)).toThrow(/贴边/);
+    expect(() => validateLevel(level, new Set(['a']))).not.toThrow();
+    level.coins[0].x = 0.8; expect(() => validateLevel(level, new Set(['a']))).toThrow(/贴边/);
+    level.coins[0].x = 0; level.coins[1].x = 0.07; level.coins[1].z = 0;
+    expect(() => validateLevel(level, new Set(['a', 'b']))).not.toThrow();
+    expect(() => validateLevel(level, new Set(['a']))).toThrow(/重叠/);
+    level.coins[1].x = 0.4;
+    level.obstacles = [{ id: 'cup', kind: 'glass', x: 0, z: -0.105, width: 0.14, depth: 0.14 }];
+    expect(() => validateLevel(level, new Set(['a']))).toThrow(/重叠/);
+    expect(() => validateLevel(level, new Set(['a']), new Set(['cup']))).not.toThrow();
+  });
+
 });
