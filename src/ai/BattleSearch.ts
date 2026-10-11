@@ -7,6 +7,13 @@ import { obstacleDistance } from '../content/LevelValidator';
 
 export interface AiShot { coinId: string; direction: Direction; power: number }
 export const AI_LIMITS = Object.freeze({ timeMs: 1800, candidates: 48, candidateSteps: PHYSICS_CONFIG.maxShotSteps * 2 + 4 });
+/** A casual opponent plans a legal shot, then makes a real, uncorrected execution error. */
+export const CASUAL_AI_PROFILE = Object.freeze({
+  timeMs: 1000, candidates: 12, angleDegrees: 7, powerError: 0.14,
+  streakAfter: 2, streakAngleMinDegrees: 18, streakAngleMaxDegrees: 32,
+  streakUnderpowerMin: 0.12, streakUnderpowerMax: 0.24,
+  openingPowers: Object.freeze([0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7]),
+});
 export interface SearchEvidence { shot: AiShot; candidates: number; successes: number; elapsedMs: number; targetPosition: { x: number; z: number } | null }
 type SearchOptions = { timeMs?: number; candidates?: number };
 type Pair = { source: CoinTransform; target: CoinTransform; direction: Direction; distance: number; rank: number };
@@ -99,15 +106,37 @@ export async function searchBattle(snapshot: SessionSnapshot, options: SearchOpt
   }
   return { shot: best, candidates: completed, successes, elapsedMs: performance.now() - started, targetPosition };
 }
-/** Opening uses an empty production world; a miss is not a foul in the distance comparison. */
-export async function searchOpening(level: LevelConfig): Promise<number> {
+function unitRandom(random: () => number): number {
+  const value = random();
+  return Number.isFinite(value) ? Math.max(0, Math.min(1 - Number.EPSILON, value)) : 0.5;
+}
+/** Do not rerun the search after adding error: the live resolver decides whether this shot hits. */
+export async function chooseCasualBattle(snapshot: SessionSnapshot, random: () => number = Math.random): Promise<AiShot> {
+  const { shot } = await searchBattle(snapshot, CASUAL_AI_PROFILE);
+  const streak = snapshot.view.chain >= CASUAL_AI_PROFILE.streakAfter;
+  const angleDegrees = streak
+    ? (unitRandom(random) < 0.5 ? -1 : 1) * (CASUAL_AI_PROFILE.streakAngleMinDegrees
+      + unitRandom(random) * (CASUAL_AI_PROFILE.streakAngleMaxDegrees - CASUAL_AI_PROFILE.streakAngleMinDegrees))
+    : (unitRandom(random) * 2 - 1) * CASUAL_AI_PROFILE.angleDegrees;
+  const powerScale = streak
+    ? 1 - CASUAL_AI_PROFILE.streakUnderpowerMin
+      - unitRandom(random) * (CASUAL_AI_PROFILE.streakUnderpowerMax - CASUAL_AI_PROFILE.streakUnderpowerMin)
+    : 1 + (unitRandom(random) * 2 - 1) * CASUAL_AI_PROFILE.powerError;
+  const radians = angleDegrees * Math.PI / 180, c = Math.cos(radians), s = Math.sin(radians);
+  const x = shot.direction.x * c - shot.direction.z * s, z = shot.direction.x * s + shot.direction.z * c;
+  const length = Math.hypot(x, z);
+  return { coinId: shot.coinId, direction: { x: x / length, z: z / length },
+    power: Math.max(PHYSICS_CONFIG.minPower, Math.min(1, shot.power * powerScale)) };
+}
+/** Opening chooses among moderate production-verified shots instead of maximizing distance. */
+export async function searchOpening(level: LevelConfig, random: () => number = Math.random): Promise<number> {
   if (level.purpose !== 'opening') throw new Error('先手思考需要专用空桌面');
   const started = performance.now();
-  let bestPower = 0.45, bestDistance = -Infinity;
-  // Moderate opponent aims well without a perfect edge shot on every run.
-  const powers = [0.45, 0.55, 0.65, 0.75, 0.85, 0.95];
-  for (const power of powers) {
-    if (performance.now() - started >= AI_LIMITS.timeMs) break;
+  const safePowers: number[] = [];
+  for (const power of CASUAL_AI_PROFILE.openingPowers) {
+    // Cold WASM initialization can consume the wall-clock budget. Finish at least
+    // one safe candidate with the fixed step cap before applying the time cutoff.
+    if (safePowers.length && performance.now() - started >= CASUAL_AI_PROFILE.timeMs) break;
     const world = await PhysicsWorld.create(level);
     try {
       if (!world.applyShot(level.activeCoinId, { x: 0, z: -1 }, power)) continue;
@@ -117,14 +146,14 @@ export async function searchOpening(level: LevelConfig): Promise<number> {
         fallen ||= events.fallenCoinIds.length > 0;
         quiet = world.isSettled() ? quiet + 1 : 0;
         if (quiet >= PHYSICS_CONFIG.settledSteps) { settled = true; break; }
-        if (step % 24 === 0 && performance.now() - started >= AI_LIMITS.timeMs) break;
+        if (safePowers.length && step % 24 === 0 && performance.now() - started >= CASUAL_AI_PROFILE.timeMs) break;
       }
       const position = world.frame.coins[0]?.position;
       if (!fallen && settled && position && tableClearance(level.table, position.x, position.z) > 0.07) {
-        const distance = Math.hypot(position.x - level.coins[0].x, position.z - level.coins[0].z);
-        if (distance > bestDistance) { bestDistance = distance; bestPower = power; }
+        safePowers.push(power);
       }
     } finally { world.dispose(); }
   }
-  return Math.max(PHYSICS_CONFIG.minPower, bestPower - Math.random() * 0.025);
+  if (!safePowers.length) throw new Error('未找到已结算的安全先手弹射');
+  return safePowers[Math.floor(unitRandom(random) * safePowers.length)];
 }

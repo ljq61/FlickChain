@@ -94,11 +94,14 @@ describe('production snapshot AI search', () => {
       expect(game.view.phase).not.toBe('error');
     } finally { game.dispose(); }
   });
-  it.each(['wood', 'marble'] as const)('chooses an opening power that settles safely on %s', async (materialId) => {
+  it.each([
+    ['wood', 0], ['wood', 0.999999], ['marble', 0], ['marble', 0.999999],
+  ] as const)('chooses a moderate opening power that settles safely on %s at random=%s', async (materialId, randomValue) => {
     const level = generateOpening({ shape: 'circle', width: 1.6, depth: 1.6, materialId });
-    const power = await searchOpening(level);
+    const power = await searchOpening(level, () => randomValue);
     const world = await PhysicsWorld.create(level);
     try {
+      expect(power).toBeGreaterThanOrEqual(0.4); expect(power).toBeLessThanOrEqual(0.7);
       expect(world.applyShot(level.activeCoinId, { x: 0, z: -1 }, power)).toBe(true);
       let fallen = false;
       for (let step = 0; step < PHYSICS_CONFIG.maxShotSteps; step++) {
@@ -106,7 +109,7 @@ describe('production snapshot AI search', () => {
         if (step > PHYSICS_CONFIG.settledSteps && world.isSettled()) break;
       }
       expect(fallen).toBe(false); expect(world.isSettled()).toBe(true);
-      expect(world.frame.coins[0].position.z).toBeLessThan(0.2);
+      expect(world.frame.coins[0].position.z).toBeLessThan(level.coins[0].z);
     } finally { world.dispose(); }
   });
 });

@@ -281,7 +281,7 @@ GameSession保留完整一杆判定：成功+1并锁定目标B，犯规换人且
 
 src/ai/AIClient.ts惰性创建模块Worker入口BattleWorker.ts；BattleSearch.ts使用GameSession.restore逐候选恢复生产物理与完整规则。exportSnapshot仅允许Battle的quiet ready/selecting状态；SessionSnapshot保存view（含battleWinScore=10）、lastFallenIds与PhysicsSnapshot。物理快照含Rapier字节、稳定ID/刚体/碰撞体映射、材质、支撑/自由/掉落/冻结/发射元数据与新补币信息。恢复重建EventQueue并验证绑定，不重新摆币。新补币仅按验证过的静止支撑初态允许导出，不为快照提前推进幸存币。
 
-自由选币时评估公共源币/目标对，接力时源限定activeCoinId。预算48候选/1.8秒，每候选从相同初态恢复、完整模拟到成功或犯规安全结算。排序考虑成功、终点留位与胜利；无得分解仍返回合法失误输入，实际得分由主世界独立判定。Opening搜索同样复用PhysicsWorld。
+自由选币时评估公共源币/目标对，接力时源限定activeCoinId。精确searchBattle保留48候选/1.8秒上限，每候选从相同初态恢复、完整模拟到成功或犯规安全结算。正式PVE的Worker调用chooseCasualBattle，以12候选/1秒有限搜索后，加入±7°角度、±14%力度误差；连得2分后角度偏差增至18–32°，减力12–24%。误差不会再经过精确搜索纠正，实际命中、加分及失误换手由主世界独立判定，不直接制造犯规或换手。chain在成功递增，补币保持，失误换手清零。Opening同样复用PhysicsWorld，从0.4–0.7中等力度的安全候选随机选择，不再追求最远。
 
 AIClient消息ID验证和10秒冷加载watchdog检查Worker错误/返回范围。App同时验证epoch、会话对象、revision、阶段与当前玩家；ai请求不转移live快照buffer。暂停/后台/菜单/重开直接terminate旧Worker、拒绝AbortError并清空缓存，恢复重新搜索。每个clone在finally释放，电脑回合在人类输入入口、PointerInput和SceneManager共同禁止选币/蓄力/视角并隐藏手指。设置/音量仍可用。
 
