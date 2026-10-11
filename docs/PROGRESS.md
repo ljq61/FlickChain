@@ -22,7 +22,8 @@
 - 高速卡杯根因为杯底碰撞盖与桌面共面。campaign-materials-v4杯高0.12 m，隐藏底延伸进桌0.03 m，封闭CCD缝隙，杯外径与可见顶高一致。24组币/桌材质、偏撞/角度回归及4组反弹命中完整结算通过；独立复核另测24组真实1.6m圆桌，无进入杯内。浏览器工程外隔离4m圆桌使用生产GameSession，满力撞杯1次后SUCCESS、+1、接力B，最小杯心距0.1033 m；隔离场景不代表每个随机布局均可解。
 - 背景音乐移除明显的合成萨克斯主奏，改温暖和弦、柔低音、稀疏刷鼓；轻微时序/力度变化与室内尾音离线生成。默认gain 0.16，58.18秒MP3循环；信号电平比上一版约低14.2 dB，非实际扬声器听感结论。来源与重生成见assets/audio-sources.md。
 - 当前完整自动化251项通过，1项可选解法生成器普通运行跳过；类型检查、构建、diff通过。v4五条旧解重新生成后输入序列不变。390×844 CUA实测首页/游戏/设置、静音开关、返回首页及材质近景，无产品运行错误，仅原有Rapier初始化弃用提示。此前独立物理/呈现审查无阻塞项；本次伴奏更新和发布复核由主代理执行。
-- 用户授权main推送与公开发布；新增[发布工作流](../.github/workflows/deploy-pages.yml)，npm ci/test/build成功后只发布dist。原Pages来源为legacy main根源码，改为GitHub Actions，避免源码HTML造成加载问题。[公开游戏](https://ljq61.github.io/FlickChain/)，实际提交与部署记录见[Actions](https://github.com/ljq61/FlickChain/actions/workflows/deploy-pages.yml)。线上状态必须在本次推送后核验，不把本地构建当成已发布。
+- 用户授权main推送与公开发布；新增[发布工作流](../.github/workflows/deploy-pages.yml)，npm ci/test/build成功后只发布dist。原Pages来源为legacy main根源码，已改为GitHub Actions。[公开游戏](https://ljq61.github.io/FlickChain/)已发布：游戏提交d08cdc5，[任务38129529044](https://github.com/ljq61/FlickChain/actions/runs/38129529044)的依赖安装、251项测试、构建、上传和部署均成功。
+- 公网验收：默认1280×720与390×844首页均正常，无空白/框架错误覆盖；桌面实际选币、动画手加载、600 ms蓄力弹射、MISS结算、复活3→2且四币保留、静音开/关、设置返回首页通过。控制台无error，仅已有Rapier弃用warning。页面脚本index-aP_3Ag5m.js、CSS、106380字节GLB、466277字节新MP3和四个WAV均HTTP200，正确MIME且逐字节匹配本地dist；MP3 SHA-256为8e1be43fea4611b7ad499da9cc9cc2406c07ae4819efab39a820ae385a493712。此验收为浏览器鼠标与视口模拟，不等于真实手机或实际扬声器听感。
 - 仍未验证：真实手机触摸/性能、实际扬声器听感、随机全链人工难度与跨设备回放；Worker AI、平台排行榜/广告复活、CrazyGames Preview和正式平台提交未实现/执行。
 
 ## 2026-10-11 连续随机单人
@@ -67,7 +68,7 @@
 | Phase 1–3：物理、接力、模式MVP | 主要功能已实现；桌面与模拟触摸验证完成，阶段出口仍有待验项目 | 真机触摸、基准手机性能、完整人工关卡体验与连续重试验收 |
 | Phase 4：Worker AI | 未开始 | 生产物理快照/搜索、三档难度、人机回合与取消 |
 | Phase 5：随机轮、材质、表现 | 木/大理石、金/铁币、杯与过渡已实现 | 随机全链体验、材质难度、真机音效与调校 |
-| Phase 6：平台交付 | 本地静态包已验证，main自动构建与Pages发布流程已配置 | 公网部署核验、性能/兼容矩阵、CrazyGames适配与Preview/发布 |
+| Phase 6：平台交付 | 本地静态包、main自动构建与Pages公开发布已验证 | 性能/兼容矩阵、CrazyGames适配与Preview/发布 |
 
 当前剩余技术提示：Rapier初始化弃用提示、较大的JS分块；本轮构建未因此失败。GitHub源码、Pages公开站点、CrazyGames发布分别留证。完整任务契约见 [TASK_PLAN.md](TASK_PLAN.md)。
 
