@@ -113,7 +113,7 @@ describe('production physics and session lifecycle', () => {
     expect(battle.selectCoin('B')).toBe(true);
     expect(battle.selectCoin('A')).toBe(true);
   });
-  it('a fall reducing Challenge to the last coin is failure, and Battle is a draw', async () => {
+  it('a fall reducing Challenge to the last coin fails, and Battle refills after swapping player', async () => {
     const layout = level([['A', 0.5, 0], ['B', -0.35, 0.3]]);
     const challenge = await session(layout);
     challenge.shoot({ x: 1, z: 0 }, 1); finish(challenge);
@@ -121,7 +121,7 @@ describe('production physics and session lifecycle', () => {
     expect(challenge.view.foulReasons).toContain('FALL');
     const battle = await session(layout, 'battle');
     battle.shoot({ x: 1, z: 0 }, 1); finish(battle);
-    expect(battle.view).toMatchObject({ phase: 'complete', scores: [0, 0], remaining: 1, winner: 'draw' });
+    expect(battle.view).toMatchObject({ phase: 'refilling', scores: [0, 0], remaining: 1, winner: null, currentPlayer: 1, canSelectCoin: true });
   });
   it('a non-source fall after contact invalidates a would-be final relay', async () => {
     const game = await session(level([['A', 0.13, 0], ['B', 0.42, 0]]));
@@ -299,7 +299,7 @@ describe('production physics and session lifecycle', () => {
     // already-valid hit never grants permission to ignore this physical fall.
     b.applyImpulse({ x: .048, y: 0, z: 0 }, true);
     finish(game);
-    expect(game.view).toMatchObject({ phase: mode === 'challenge' ? 'failed' : 'complete', scores: [0, 0], remaining: 1 });
+    expect(game.view).toMatchObject({ phase: mode === 'challenge' ? 'failed' : 'refilling', scores: [0, 0], remaining: 1 });
     expect(game.view.foulReasons).toEqual(['FALL']);
     expect(game.lastFallenCoinIds).toEqual(['B']);
     expect(game.frame.coins.map((coin) => coin.id)).toEqual(['C']);

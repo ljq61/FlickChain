@@ -243,6 +243,18 @@ export class SceneManager {
     this.updateCamera();
   }
 
+  /** Both opening trials use the same bottom-to-top axis and whole-table camera. */
+  resetView(): void {
+    this.orbitYaw = 0;
+    this.orbitPitch = 0.75;
+    this.focusId = null;
+    this.cameraFocus.set(0, 0, 0);
+    this.desiredFocus.set(0, 0, 0);
+    this.orbitDistance = this.overviewDistance;
+    this.cameraReady = false;
+    this.updateCamera();
+  }
+
   getAimDirection(): { x: number; z: number } {
     const forward = new THREE.Vector3();
     this.camera.getWorldDirection(forward);
@@ -416,7 +428,7 @@ export class SceneManager {
       this.resize();
     }
     const transitioning = this.isIntroducing || this.isRemovingObstacles;
-    const requestedFocusId = transitioning ? null : view?.phase === 'selecting' ? this.focusId : view?.activeCoinId;
+    const requestedFocusId = transitioning || view?.battle?.stage === 'opening' ? null : view?.phase === 'selecting' ? this.focusId : view?.activeCoinId;
     const requestedFocus = requestedFocusId ? frame.coins.find((coin) => coin.id === requestedFocusId) : undefined;
     this.tavern.setMenuView(view === null);
     this.desiredFocus.set(requestedFocus?.position.x ?? 0, 0, requestedFocus?.position.z ?? 0);
@@ -444,8 +456,9 @@ export class SceneManager {
       this.coinMeshes.delete(id);
       this.coinShadows.delete(id);
     }
-    const ready = view?.phase === 'ready' && !transitioning;
-    const selecting = view?.phase === 'selecting' && !transitioning;
+    const human = view?.inputOwner !== 'computer';
+    const ready = human && view?.phase === 'ready' && !transitioning;
+    const selecting = human && view?.phase === 'selecting' && !transitioning;
     const pulse = this.reducedMotion.matches ? 0.5 : 0.5 + 0.5 * Math.sin(performance.now() * 0.006);
     this.glowMaterial.emissiveIntensity = this.ironGlowMaterial.emissiveIntensity = 0.12 + 0.25 * pulse;
     let glowAt: THREE.Vector3 | null = null;

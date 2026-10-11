@@ -1,10 +1,16 @@
 import type { Direction, GameMode, GamePhase, GameView, LevelConfig, ShotFacts, WorldFrame } from '../types/contracts';
-import { PhysicsWorld, type PhysicsFeedback } from '../physics/PhysicsWorld';
+import { PhysicsWorld, type PhysicsFeedback, type PhysicsSnapshot } from '../physics/PhysicsWorld';
 export type { PhysicsFeedback } from '../physics/PhysicsWorld';
 import { PHYSICS_CONFIG } from '../physics/MaterialRegistry';
 import { certainFouls, resolveShot } from '../gameplay/ShotResolver';
 
 let sessionSequence = 0;
+export const BATTLE_WIN_SCORE = 5;
+export interface SessionSnapshot {
+  physics: PhysicsSnapshot;
+  view: GameView;
+  lastFallenIds: string[];
+}
 /** Sole writer of business state; physics owns the board. No renderer/DOM imports. */
 export class GameSession {
   private disposed = false;
@@ -26,6 +32,7 @@ export class GameSession {
   }
   static async create(level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1 = 0): Promise<GameSession> {
     if ((mode !== 'challenge' && mode !== 'battle') || (firstPlayer !== 0 && firstPlayer !== 1)) throw new Error('无效模式或先手');
+    if (level.purpose === 'opening') throw new Error('先手比较使用独立先手会话');
     const snapshot = structuredClone(level);
     const physics = await PhysicsWorld.create(snapshot);
     return new GameSession(physics, snapshot, mode, firstPlayer);
@@ -33,6 +40,40 @@ export class GameSession {
   get view(): GameView { return structuredClone(this.state); }
   get frame(): WorldFrame { return this.physics.frame; }
   get lastFallenCoinIds(): readonly string[] { return [...this.lastFallenIds]; }
+  /** AI clones the exact settled production world; no fresh-layout approximation. */
+  exportSnapshot(): SessionSnapshot {
+    if (this.disposed || (this.state.phase !== 'ready' && this.state.phase !== 'selecting')) throw new Error('仅能导出可操作的静止游戏会话');
+    return { physics: this.physics.snapshot(), view: this.view, lastFallenIds: [...this.lastFallenIds] };
+  }
+  static async restore(input: SessionSnapshot): Promise<GameSession> {
+    const snapshot = structuredClone(input);
+    const view = snapshot.view;
+    if (!view || (view.mode !== 'challenge' && view.mode !== 'battle') || (view.currentPlayer !== 0 && view.currentPlayer !== 1)
+      || (view.phase !== 'ready' && view.phase !== 'selecting') || view.winner !== null
+      || !Array.isArray(view.scores) || view.scores.length !== 2 || view.scores.some((score) => !Number.isInteger(score) || score < 0)
+      || !Number.isInteger(view.remaining) || view.remaining < 2 || typeof view.canSelectCoin !== 'boolean' || view.error !== null
+      || !Number.isInteger(view.shotCount) || view.shotCount < 0 || !Number.isInteger(view.chain) || view.chain < 0
+      || !Number.isInteger(view.revision) || view.revision < 0 || typeof view.sessionId !== 'string' || !view.sessionId
+      || snapshot.physics?.level?.purpose === 'opening' || view.levelId !== snapshot.physics?.level?.id
+      || (view.mode === 'battle' && view.scores.some((score) => score >= BATTLE_WIN_SCORE))) throw new Error('游戏快照状态无效');
+    const physics = await PhysicsWorld.restore(snapshot.physics);
+    try {
+      if (view.remaining !== physics.frame.coins.length || (view.phase === 'ready' && (!view.activeCoinId || !physics.hasCoin(view.activeCoinId)))
+        || (view.phase === 'selecting' && (!view.canSelectCoin || view.activeCoinId !== null))) throw new Error('游戏快照控制映射无效');
+      const game = new GameSession(physics, snapshot.physics.level, view.mode, view.currentPlayer);
+      Object.assign(game.state, view); game.lastFallenIds = [...snapshot.lastFallenIds];
+      return game;
+    } catch (error) { physics.dispose(); throw error; }
+  }
+  /** Refill only an exhausted settled Battle board; carry score, turn and relay. */
+  refill(level: LevelConfig): boolean {
+    if (this.disposed || this.state.mode !== 'battle' || this.state.phase !== 'refilling' || level.purpose === 'opening') return false;
+    const retained = this.state.activeCoinId;
+    const canSelect = this.state.canSelectCoin;
+    if ((retained && !level.coins.some((coin) => coin.id === retained)) || !this.physics.reconfigure(level)) return false;
+    this.continueRound(level.id, retained, canSelect);
+    return true;
+  }
   /** Continue from the single settled survivor, keeping cumulative score and relay ownership. */
   advanceRound(level: LevelConfig): boolean {
     if (this.disposed || this.state.mode !== 'challenge' || this.state.phase !== 'complete' || this.state.remaining !== 1) return false;
@@ -143,23 +184,24 @@ export class GameSession {
       this.state.chain++;
       this.state.activeCoinId = result.targetCoinId;
       this.state.remaining = this.physics.frame.coins.length;
-      this.state.phase = this.state.remaining <= 1 ? 'complete' : 'ready';
+      this.state.phase = this.state.mode === 'battle'
+        ? this.state.scores[this.state.currentPlayer] >= BATTLE_WIN_SCORE ? 'complete' : this.state.remaining <= 1 ? 'refilling' : 'ready'
+        : this.state.remaining <= 1 ? 'complete' : 'ready';
     } else {
       this.state.chain = 0;
       if (this.state.mode === 'challenge') this.state.phase = 'failed';
-      else if (this.state.remaining <= 1) this.state.phase = 'complete';
       else {
         this.state.currentPlayer = this.state.currentPlayer === 0 ? 1 : 0;
         this.state.activeCoinId = null;
         this.state.canSelectCoin = true;
-        this.state.phase = 'selecting';
+        this.state.phase = this.state.remaining <= 1 ? 'refilling' : 'selecting';
       }
       if (!this.physics.hasCoin(facts.sourceCoinId)) this.state.activeCoinId = null;
     }
     if (this.state.mode === 'battle' && this.state.phase === 'complete') {
-      this.state.winner = this.state.scores[0] === this.state.scores[1] ? 'draw' : this.state.scores[0] > this.state.scores[1] ? 0 : 1;
+      this.state.winner = this.state.currentPlayer;
     }
-    if (timedOut && this.state.mode === 'battle' && (this.state.phase === 'ready' || this.state.phase === 'selecting')) this.physics.unfreeze();
+    if (timedOut && this.state.mode === 'battle' && (this.state.phase === 'ready' || this.state.phase === 'selecting' || this.state.phase === 'refilling')) this.physics.unfreeze();
     this.state.revision++;
   }
   pause(): void {

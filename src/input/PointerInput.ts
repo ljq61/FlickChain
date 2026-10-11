@@ -102,7 +102,7 @@ export class PointerInput {
   private begin(event: PointerEvent): void {
     if (this.gesture || this.pointers.size > 1 || event.button !== 0 || !event.isPrimary) return;
     const { view, frame } = this.getState();
-    if (!view || !frame || (view.phase !== 'ready' && view.phase !== 'selecting')) return;
+    if (!view || !frame || view.inputOwner === 'computer' || (view.phase !== 'ready' && view.phase !== 'selecting')) return;
     const coin = this.findCoin(view, frame, event.clientX, event.clientY);
     event.preventDefault();
     if (coin && view.canSelectCoin && (view.phase === 'selecting' || coin.id !== view.activeCoinId)) {
@@ -119,6 +119,7 @@ export class PointerInput {
         startedAt: performance.now(),
       };
     } else {
+      if (view.battle?.stage === 'opening') return;
       this.gesture = {
         kind: 'orbit', pointerId: event.pointerId, sessionId: view.sessionId, revision: view.revision,
         phase: view.phase, player: view.currentPlayer, last: { x: event.clientX, y: event.clientY },
@@ -157,8 +158,8 @@ export class PointerInput {
 
   private valid(gesture: Gesture): boolean {
     const { view, frame } = this.getState();
-    if (!view || !frame || view.sessionId !== gesture.sessionId || view.revision !== gesture.revision || view.phase !== gesture.phase || view.currentPlayer !== gesture.player) return false;
-    if (gesture.kind === 'orbit') return true;
+    if (!view || !frame || view.inputOwner === 'computer' || view.sessionId !== gesture.sessionId || view.revision !== gesture.revision || view.phase !== gesture.phase || view.currentPlayer !== gesture.player) return false;
+    if (gesture.kind === 'orbit') return view.battle?.stage !== 'opening';
     return frame.coins.some((coin) => coin.id === gesture.coinId) && (gesture.kind === 'select' || view.activeCoinId === gesture.coinId);
   }
 
@@ -194,7 +195,10 @@ export class PointerInput {
     if (finished.kind === 'select') this.callbacks.pickCoin(finished.coinId);
     else if (finished.kind === 'shot') {
       const elapsed = performance.now() - finished.startedAt;
-      if (elapsed >= FINGER_MIN_FIRE_MS) this.callbacks.shoot(this.scene.getAimDirection(), chargePower(elapsed));
+      if (elapsed >= FINGER_MIN_FIRE_MS) {
+        const direction = this.getState().view?.battle?.stage === 'opening' ? { x: 0, z: -1 } : this.scene.getAimDirection();
+        this.callbacks.shoot(direction, chargePower(elapsed));
+      }
     }
   }
 

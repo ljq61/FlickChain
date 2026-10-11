@@ -49,8 +49,10 @@ function overlaps(a: ObstacleConfig, b: ObstacleConfig): boolean {
 
 /** Retained allowances are for reconfiguration only; initial create always uses strict clearance. */
 export function validateLevel(input: unknown, retainedIds: ReadonlySet<string> = new Set(), retainedObstacleIds: ReadonlySet<string> = new Set()): LevelConfig {
-  const raw = record(input, 'root', ['schemaVersion', 'id', 'name', 'lesson', 'table', 'coins', 'activeCoinId', 'obstacles']);
+  const raw = record(input, 'root', ['schemaVersion', 'purpose', 'id', 'name', 'lesson', 'table', 'coins', 'activeCoinId', 'obstacles']);
   if (raw.schemaVersion !== 1) fail('schemaVersion', '仅支持版本 1');
+  if (raw.purpose !== undefined && raw.purpose !== 'opening') fail('purpose', '未知关卡用途');
+  const opening = raw.purpose === 'opening';
   const table = record(raw.table, 'table', ['width', 'depth', 'materialId', 'shape']);
   if (table.materialId !== 'wood' && table.materialId !== 'marble') fail('table.materialId', '未知桌面材质');
   const width = finite(table.width, 'table.width', true);
@@ -78,7 +80,9 @@ export function validateLevel(input: unknown, retainedIds: ReadonlySet<string> =
     if (tableClearance(tableConfig, x, z) <= (retainedIds.has(id) ? 0 : coinRadius(materialId) + PHYSICS_CONFIG.initialClearance)) fail(path, '硬币越界或贴边');
     return { id, x, z, materialId };
   });
-  if (coins.length < 2) fail('coins', 'CLEAR_ALL 至少需要两枚硬币');
+  if (opening) {
+    if (coins.length !== 1 || coins[0].materialId !== 'standard') fail('coins', '先手比较必须且仅有一枚金币');
+  } else if (coins.length < 2) fail('coins', 'CLEAR_ALL 至少需要两枚硬币');
   if (coins.length > PHYSICS_CONFIG.maxCoins) fail('coins', `最多支持 ${PHYSICS_CONFIG.maxCoins} 枚硬币`);
   const activeCoinId = string(raw.activeCoinId, 'activeCoinId');
   if (!coins.some((coin) => coin.id === activeCoinId)) fail('activeCoinId', '必须引用存在的硬币');
@@ -105,6 +109,7 @@ export function validateLevel(input: unknown, retainedIds: ReadonlySet<string> =
     }
     return result;
   });
+  if (opening && obstacles.length !== 0) fail('obstacles', '先手比较不能有障碍');
   for (let i = 0; i < coins.length; i++) {
     const coin = coins[i];
     for (const other of coins.slice(i + 1)) {
@@ -121,6 +126,6 @@ export function validateLevel(input: unknown, retainedIds: ReadonlySet<string> =
       if (overlaps(obstacles[i], other)) fail('obstacles', `${obstacles[i].id} 与 ${other.id} 重叠或接触`);
     }
   }
-  return { schemaVersion: 1, id: string(raw.id, 'id'), name: string(raw.name, 'name'), lesson: string(raw.lesson, 'lesson'),
+  return { schemaVersion: 1, ...(opening ? { purpose: 'opening' as const } : {}), id: string(raw.id, 'id'), name: string(raw.name, 'name'), lesson: string(raw.lesson, 'lesson'),
     table: tableConfig, coins, activeCoinId, obstacles };
 }

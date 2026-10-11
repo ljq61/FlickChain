@@ -2,7 +2,8 @@ export type Vec3 = { x: number; y: number; z: number };
 export type Quaternion = { x: number; y: number; z: number; w: number };
 export type Direction = { x: number; z: number };
 export type GameMode = 'challenge' | 'battle';
-export type GamePhase = 'ready' | 'selecting' | 'simulating' | 'failed' | 'complete' | 'paused' | 'error';
+export type BattleVariant = 'pvp' | 'pve';
+export type GamePhase = 'ready' | 'selecting' | 'simulating' | 'refilling' | 'failed' | 'complete' | 'paused' | 'error';
 export type CoinMaterialId = 'standard' | 'iron';
 export type TableMaterialId = 'wood' | 'marble';
 
@@ -31,6 +32,8 @@ export interface TableConfig {
 }
 export interface LevelConfig {
   schemaVersion: 1;
+  /** A single gold coin on an empty table, used only to compare opening distances. */
+  purpose?: 'opening';
   id: string;
   name: string;
   lesson: string;
@@ -78,6 +81,16 @@ export interface GameView {
   lastResult: ShotResult | null;
   winner: 0 | 1 | 'draw' | null;
   error: string | null;
+  /** App adds local opponent/phase information; Core still owns score and turn. */
+  battle?: BattleView;
+  inputOwner?: 'human' | 'computer';
+}
+export interface BattleView {
+  variant: BattleVariant;
+  stage: 'opening' | 'playing';
+  distances: [number | null, number | null];
+  fallen: [boolean, boolean];
+  openingAttempt: number;
 }
 export interface AimPreview {
   source: Vec3;

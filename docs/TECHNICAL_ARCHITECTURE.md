@@ -1,6 +1,6 @@
-# FlickChain《一弹到底》技术架构 V0.5
+# FlickChain《一弹到底》技术架构 V0.6
 
-版本：V0.5 · 日期：2026-10-11 · 状态：MVP与Pages构建发布流程已实现，后续AI与CrazyGames模块保留规划契约。
+版本：V0.6 · 日期：2026-10-11 · 状态：MVP与Pages构建发布流程已实现，PVP/PVE与Worker AI已接入，CrazyGames模块保留规划契约。
 
 本文件把产品规则转为模块边界和实现契约。产品范围以 `docs/PRD.md` 为准，阶段任务以 `docs/TASK_PLAN.md` 为准；若三份文档冲突，应先统一契约再实现。生产实现与验证范围见 [开发进度](PROGRESS.md) ；手模型/音效历史证据见 [前一版验收](validation/2026-10-11-hand-physics-audio.md)。下方目录、接口草案及AI/Worker、平台章节仍包含规划，不能把预留模块当成已实现能力。
 
@@ -11,9 +11,9 @@
 | Web 3D、所有硬币公共、Challenge 任意犯规失败 | 项目聊天「小游戏玩法设计」及用户修正，视为硬约束 |
 | TypeScript + Vite + Three.js + Rapier 3D WASM，HTML/CSS、Pointer Events、Web Audio | 源聊天技术方向及项目约定 |
 | 整杆判定、静止后移除 A、接管 B 终点、保留 Battle 残局 | 产品规则契约，所有模式共用 |
-| Last Coin 为 MVP 对战、平分显示平局、TIMEOUT 零分冻结后换人 | 本轮采用的 V0.2 默认，不阻止开工；写入版本化规则，阶段 3 试玩评估，变更更新决策记录 |
+| Battle先5分、比远争先、TIMEOUT零分安全结算后换人 | 2026-10-11用户规则，V0.6；比远与补币细则见PRD §5 |
 | 120 Hz、静止阈值、材质系数、AI 搜索预算、画质档位 | 调校候选，必须以实际模拟和手机验证决定 |
-| 连续随机轮、后续 AI、平台接入 | 分阶段交付范围，不能提前当成已验证能力 |
+| 连续随机轮、单档PVE、后续平台接入 | 分阶段交付范围，不能提前当成已验证能力 |
 
 初期运行完全离线：不需要账号、服务端或平台 SDK。未来联网只预留边界，不加入 MVP 开发链。画面为精致微缩桌面／玩具摄影感，先用木桌与标准硬币。竖屏 9:16 与桌面横屏 16:9 改变相机、布局和画质，不改变桌面几何、材质、力度范围或规则。
 
@@ -40,8 +40,8 @@ flowchart TD
     App --> Render[Three.js 渲染 / 相机]
     App --> Audio[Web Audio 适配]
     Render -.只读姿态.-> Physics
-    App --> AI[AIController]
-    AI --> Worker[AIWorker / ShotSearch]
+    App --> AI[AIClient]
+    AI --> Worker[BattleWorker / BattleSearch]
     Worker --> Physics
     Worker --> Resolver
     Worker --> Materials
@@ -64,9 +64,9 @@ src/
   modes/ChallengeMode.ts         目标、失败、重试与关卡完成
   modes/BattleMode.ts            玩家、连续得分、换人、终局
   app/GameApp.ts                 启动、模块连接、暂停、恢复、重开
-  ai/AIWorker.ts                 Worker 消息与物理 clone 生命周期
-  ai/AIController.ts             请求版本、取消、结果验证
-  ai/ShotSearch.ts               候选生成、评分、搜索预算
+  ai/BattleWorker.ts             Worker 消息与物理 clone 生命周期
+  ai/AIClient.ts                 请求版本、取消、结果验证
+  ai/BattleSearch.ts             候选生成、评分、搜索预算
   content/LevelLoader.ts         数据读取、版本解析
   content/LevelValidator.ts      结构、几何、目标和解回放验证
   rendering/                    场景、相机、Mesh、光影、插值
@@ -81,9 +81,11 @@ tests/                          纯规则、生产物理回归、生命周期测
 
 ## 3. 坐标、单位与输入契约
 
+本节命令DTO及后面的大写状态图是逻辑规划。实际入口使用contracts.ts的ready/selecting/simulating/paused/refilling等状态；电脑思考保持ready/selecting，以inputOwner=computer关闭人类控制，GameApp校验当前有效决策后调用同一Core选币/发射方法，详见§6–7。人类正式杆按相机方向；比远锁定默认-Z，电脑按搜索返回方向。
+
 采用右手世界坐标：桌面为 XZ 平面，Y 向上。内部统一 SI：长度 m、时间 s、质量 kg、线速度 m/s、角速度 rad/s、冲量 kg·m/s。美术可用缩放后的视觉尺寸，但输入、判定与 Rapier 只使用世界单位。硬币半径、厚度、质量、重心、桌面尺寸及重力放入版本化配置，禁止散落在渲染或 AI 中。
 
-`campaign-materials-v3` 最大冲量0.048 N·s，保持1.25秒蓄满及原力度曲线。外层生产步长为120 Hz，每步由两个240 Hz Rapier内步聚合碰撞/掉落事件，避免满力度撞入薄挡板。桌边只在重心实际越界或真实离桌后解锁倾倒，不因币缘悬伸或单次支撑接触缺失而解锁。开局落桌是 `CoinArrival` 呈现动画，稳定物理布局不变；入场未完成时由GameApp统一锁定输入，落稳后恢复选币。真实碰撞及落桌短录音通过Web Audio加载，出处见 `assets/audio-sources.md`；滑音仅根据桌面上的水平移动渐变，静音/暂停/销毁停止声音。
+`campaign-materials-v4` 最大冲量0.048 N·s，保持1.25秒蓄满及原力度曲线。外层生产步长为120 Hz，每步由两个240 Hz Rapier内步聚合碰撞/掉落事件，避免满力度撞入薄挡板。桌边只在重心实际越界或真实离桌后解锁倾倒，不因币缘悬伸或单次支撑接触缺失而解锁。开局落桌是 `CoinArrival` 呈现动画，稳定物理布局不变；入场未完成时由GameApp统一锁定输入，落稳后恢复选币。真实碰撞及落桌短录音通过Web Audio加载，出处见 `assets/audio-sources.md`；滑音仅根据桌面上的水平移动渐变，静音/暂停/销毁停止声音。
 
 握拳手使用用户调整的 `blender/pointing-hand-rigged.blend`，经 `scripts/export-pointing-hand.py` 导出为 `public/models/flick-hand.glb`；`assets/flick-hand.blend` 是独立的游戏适配副本。保留原始网格、三节食指骨骼、拇指及蒙皮权重，导出副本统一骨名、尺度与 +Z 发射朝向，手背朝 +Y、手心朝桌面，将 `Index_Curl` 的12–36帧采样为0–30帧、30fps的一秒 `FlickCharge`；运行时按蓄力进度采样，不播放原动作的等待和回正段。glTF 使用线性蒙皮，原 Blender 源的保体积设置保持不变。按真实变形网格校准桌面净空；待机点击轴高度从资产取得，不绑定旧模型的0.025米。GameApp 在创建会话前等待 SceneManager 加载模型；加载失败保留请求参数供错误按钮重试。FlickFinger 用 AnimationMixer 采样食指动作，拳体固定，高蓄力抖动只作用于外层节点。输入点来自骨骼标记和真实蒙皮表面，CPU查询使用与渲染相同的 `updateMatrixWorld` 更新绑定逆矩阵。销毁中止下载并释放迟到解析结果。该资产仅影响呈现与点击，不进入物理世界。
 
@@ -269,68 +271,21 @@ GameSession.advanceRound(level) 仅在 challenge complete 且唯一幸存币时�
 
 复活只在已结算 failed、无过渡且剩余机会大于 0 时允许。lastFallenCoinIds 来自最近结算杆，generateRevival 只补该掉落数量的金币；GameSession.revive 保留残局和分数，清掉失败并重新 selecting。仅成功后机会减 1，换轮不重置。无新币时不重落旧杯。重新开始完整销毁旧会话，从随机第一轮开始。
 
-### 6.2 本地 Battle：Last Coin 建议默认
+### 6.2 本地Battle：PVP/PVE抢5分
 
-两名玩家共用所有硬币；选币只是主控指定，不创建所有权。起手与每次失败换人都进入 `SELECTING`，由当前玩家从仍在桌上的公共币中点选，首杆发射前可反复切换。`GameView.canSelectCoin` 初始与换人后为 true，仅成功接受发射后变 false；实际选币同时验证 phase 为 selecting/ready，暂停与终局拒绝。合法 SUCCESS 得一分并继续，主控固定为目标 B；失败后将选择权交给下家。失败未掉落的 A 仍保留在真实位置，仍可被下一玩家重新选中；A 已掉落时只能从剩余币中选择。
+GameApp生成BattleGenerator随机棋盘：木/大理石、1–5杯、9枚金币/铁币。Shell次级选择传入BattleVariant。OpeningSession使用purpose=opening单金币空桌，双方从(0,+0.64)向-Z依次弹射；生产物理停稳测量位移，掉落/超时弃权、1mm同距/双方弃权重试。App显示结果1.3秒再advance，胜者作为GameSession.create的firstPlayer；重新开始创建新随机桌并重比。
 
-人机模式进入 SELECTING 时，由当前玩家 owner 决定选择来源：人类显示剩余公共币选择 UI；AIController 按有限预算的选币策略选择有效剩余 coinId，并通过同样的 sessionId／revision／playerId 校验提交选币命令。不得等待人类替 AI 选币。选币不移动币，成功提交后到 READY，再发起 AI_THINKING 搜索；选币结果过期或取消时丢弃，失败时采用明确的合法回退选择。人类在 AI 选择阶段仍无操作权。
+GameSession保留完整一杆判定：成功+1并锁定目标B，犯规换人且自由选择公共币。5分优先终局；未到5分剩0–1币进入refilling，GameApp调用generateBattleRefill与session.refill，保留比分/玩家/幸存刚体真实位姿/同桌同杯，补至9币。成功仍锁定B，犯规仍由下家选币；入场期间锁操作，暂停冻结入场。
 
-安全结算后剩余至多一币即结束，按累计分数决定胜负；V0.2 默认平分显示平局，不自动加入无限加赛。有效最后一次 SUCCESS 先计分，再检查终局。因犯规掉到至多一币也结束 Battle，但该杆零分；Challenge 同情形仍失败。棋盘数据固定初始主控币，Player 1 首局先手，“再来一局”交替先手。这些模式默认写入版本化配置，阶段 3 试玩评估公平性。
+### 7. Worker AI与生产快照
 
-当 A 仍存在但终态不适合继续（超时非法支撑等），不得静默选择另一个币规避规则，需先执行已定义清理／错误策略。模式负责决定选择入口，输入层不能绕过。
+src/ai/AIClient.ts惰性创建模块Worker入口BattleWorker.ts；BattleSearch.ts使用GameSession.restore逐候选恢复生产物理与完整规则。exportSnapshot仅允许Battle的quiet ready/selecting状态；SessionSnapshot保存view、lastFallenIds与PhysicsSnapshot。物理快照含Rapier字节、稳定ID/刚体/碰撞体映射、材质、支撑/自由/掉落/冻结/发射元数据与新补币信息。恢复重建EventQueue并验证绑定，不重新摆币。新补币仅按验证过的静止支撑初态允许导出，不为快照提前推进幸存币。
 
-## 7. Worker AI 与预测
+自由选币时评估公共源币/目标对，接力时源限定activeCoinId。预算48候选/1.8秒，每候选从相同初态恢复、完整模拟到成功或犯规安全结算。排序考虑成功、终点留位与胜利；无得分解仍返回合法失误输入，实际得分由主世界独立判定。Opening搜索同样复用PhysicsWorld。
 
-阶段 4 再启用 AI。AI 搜索和可选瞄准预测均复用生产 PhysicsWorld、PhysicsConfig、MaterialRegistry 与 ShotResolver，不另写简化弹球公式。瞄准预测是否在 MVP 出现另由 PRD 决定，架构不要求提前实现。
+AIClient消息ID验证和10秒冷加载watchdog检查Worker错误/返回范围。App同时验证epoch、会话对象、revision、阶段与当前玩家；ai请求不转移live快照buffer。暂停/后台/菜单/重开直接terminate旧Worker、拒绝AbortError并清空缓存，恢复重新搜索。每个clone在finally释放，电脑回合在人类输入入口、PointerInput和SceneManager共同禁止选币/蓄力/视角并隐藏手指。设置/音量仍可用。
 
-官方 Rapier 支持世界快照字节及恢复，见 [Serialization](https://rapier.rs/docs/user_guides/javascript/serialization/)。物理快照不等于游戏快照：项目还必须封装稳定 coinId 映射、主控币、剩余币、材质／配置／规则版本和构建元数据。恢复时验证映射与数量，禁止仅凭裸 collider handle 关联业务。
-
-```ts
-interface SimulationSnapshot {
-  schemaVersion: number;
-  sessionId: string;
-  stateRevision: number;
-  physicsBytes: Uint8Array;
-  coinBindings: readonly {
-    coinId: CoinId;
-    bodyHandle: number;
-    colliderHandles: readonly number[];
-    materialId: string;
-    rotationConstraintState: 'TABLE_LOCKED' | 'FREE';
-    supportStableSteps: number; // 保留约束切换的业务计数
-  }[];
-  activeCoinId: CoinId;
-  physicsConfigVersion: string;
-  materialVersion: string;
-  ruleVersion: string;
-  rapierVersion: string;
-  levelVersion: string;
-}
-interface AIRequest {
-  requestId: string;
-  snapshot: SimulationSnapshot;
-  budget: { candidateLimit: number; simulationStepLimit: number; wallTimeMs: number };
-  seed: number;
-}
-interface AIResponse {
-  requestId: string;
-  sessionId: string;
-  stateRevision: number;
-  shot: ShotCommand | null;
-  evaluatedCandidates: number;
-  reason: 'FOUND' | 'BUDGET' | 'CANCELLED' | 'ERROR';
-}
-```
-
-传输快照时复制专用 bytes，再 transfer 复制品；不得 detach 正被主世界或其它搜索持有的 buffer。每个候选从同一初态恢复 clone，结束／取消／异常均显式释放 world 与事件队列。搜索复用缓存也必须验证版本，不能复用已推进世界作为另一个候选的起点。
-
-搜索候选可从方向与力度离散采样开始，再围绕有效方案局部细化。得分优先考虑合法成功，其次是同玩家续杆后的可接力性和风险；不能把掉落减币当成收益。所有候选有单杆步数上限、总候选／模拟步预算及响应墙钟预算。分层难度优先改变候选数量、采样密度及选择策略，保持真实物理一致。
-
-预算初步候选为数百毫秒至约一秒量级的思考等待；候选数和并发 clone 数以手机测量确定，默认单 Worker 不多开 clone。同步长循环会阻塞 Worker 消息，因此取消必须通过分批 yield 后检查令牌，或由主线程 terminate 并重建 Worker；只发送 CANCEL 不足以保证即时停止。暂停、重试、切模式、选币或 revision 改变均使请求失效。
-
-AIController 接受结果前校验 requestId、sessionId、revision、主控币和所有输入范围，再通过带 `issuer: 'AI'` 的 ShotCommand 及 `acceptShot` 发射。预算到期若有合法候选可返回它；否则返回 null，由显式降级策略产生一个合法力度／方向命令，并接受真实杆的零分风险；不得直接跳过轮次或保证必胜。Worker 崩溃应结束思考状态并提供重试或本地双人选择。暂停恢复到 AI_THINKING 时重新创建有效请求，不能继续等待已取消的旧请求。
-
-Vite 的 Worker 构建方式依据 [Web Workers 官方文档](https://vite.dev/guide/features#web-workers)，实际实现时选择静态可分析的入口，验证开发和 production 路径、WASM 资源路径以及 Worker 初始化失败。具体 API 语法随锁定版本再核对。
+Vite使用静态new URL('./BattleWorker.ts', import.meta.url)输出独立Worker资源；生产包与Pages子路径实际检查分别记录。当前一档策略，手机预算和三档难度尚待测量；本机Node耗时不代表手机。
 
 ### 7.1 可复现性范围
 
@@ -379,7 +334,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 | 纯规则测试 | MISS、唯一 B、重复 A-B、A-B 后 B-C/D 合法、A 直接 B/C、同一步多币、墙合法、任意掉落、TIMEOUT、重复提交 | ShotResolver 与模式契约，不证明真实碰撞采集 |
 | 生产物理回归 | 薄币／薄墙最大冲量、反弹、桌上锁 X/Z 且可 Y 旋转、离桌解锁翻落、支撑切换防抖／无姿态突跳、空中低速、边缘掉落、全场静止、删除／handle 复用、冻结 | 固定配置的真实 Rapier 与显式转动约束行为 |
 | 单杆生命周期 | 发射拒绝、早期失败后清理、成功移除 A 与接管 B、暂停恢复、重开、过期 callback | 业务与物理连接，无输入空窗 |
-| 模式回归 | Challenge 掉落减币失败、合法最终目标、Battle 连续得分、残局、A 掉落重选、平局、至多一币终局 | 模式完整转移 |
+| 模式回归 | Challenge 掉落减币失败、合法最终目标、Battle比远先手/同距重比、连续得分、残局、A掉落重选、≤1币补足9、5分终局 | 模式完整转移 |
 | AI／快照 | clone 初态一致、映射／转动约束恢复、live buffer 未 detach、取消／terminate、过期响应、AI_THINKING 合法发射且人类被拒、A 掉落后 AI 自行选币、预算、资源释放 | 搜索正确使用生产模型，AI 回合不会因权限／选币卡住 |
 | 关卡解回放 | 随机配方/初稳/继承/复活，旧五布局完整解回放 | 该版本关卡可解证据 |
 | 浏览器鼠标 | 选择、拖动、释放／取消、暂停／重试、失败锁定、光圈／HUD／命中区恢复、竖横布局 | 实际渲染及鼠标交互 |
@@ -394,7 +349,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 
 1. **Physics／Input**：可启动真实 3D 物理，标准币／木桌、固定时钟、拖动、支撑／掉落与60/120对照；不提前做完整 AI 或平台。
 2. **Rules**：完整单杆采集、整杆合法性、一次提交、接力／清理、TIMEOUT与规则回归。
-3. **Modes（MVP）**：连续随机 CLEAR_ALL Challenge、本地 Battle 全流程、教程／基础音效／本地进度、终局／平局／选币、实际浏览器交互；对 V0.2 默认竞争规则定稿。
+3. **Modes（MVP）**：连续随机 CLEAR_ALL Challenge、本地 Battle 全流程、教程／基础音效／本地进度、5分终局／比远／补币／选币、实际浏览器交互；按V0.6规则验收。
 4. **AI**：Worker clone、共享判定、预算／取消、难度与手机性能验证。
 5. **Content**：材质调校、随机轮全链体验与回归、视觉／音频／真机打磨。
 6. **Publish**：刷新平台文档与限制、SDK、静态包、上线与平台验收。
@@ -405,7 +360,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 
 | 项目 | 决策节点与证据 |
 | --- | --- |
-| Last Coin、平局、固定初始币与交替先手 | 当前与 PRD V0.2 默认一致；阶段 3 试玩评估公平性 |
+| 抢5分、随机九币/杯与比远先手 | 当前与PRD V0.6一致；同距与双方掉落重比，公平性需试玩 |
 | TIMEOUT 步数、冻结非法支撑处理 | 阶段 1／2 用真实难静止场景确定；须与规则版本绑定 |
 | 60/120 Hz、静止阈值、CCD／求解迭代、桌上转动锁定切换 | 阶段 1 固定场景与真机对照，选定后不随 FPS 改变；验证离桌解锁和重落桌面策略 |
 | 材料摩擦／恢复／阻尼及币尺度 | 先标准币木桌，实测滑行距离、回弹和停稳；变化重验关卡 |
@@ -419,7 +374,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 
 ## 首版实际实现映射（2026-10-09）
 
-首版为 Challenge/Local Battle，保留上述后续扩展契约。为减少未使用抽象，固定步、碰撞采集与支撑检测集中在 `src/physics/PhysicsWorld.ts`；整杆控制与两种模式集中在 `src/core/GameSession.ts`，纯规则在 `src/gameplay/ShotResolver.ts`。相机轨道、选币聚焦和瞄准呈现在 `SceneManager`，指针生命周期、空白旋转、选币候选和当前币蓄力在 `PointerInput`；`GameApp` 串起 `selecting → ready → simulating`，并在 Battle 犯规换人后清空候选。关卡静态 JSON 经 `LevelValidator` 加载，导出 `src/content/levels.ts`。尚未创建 Worker AI、平台 SDK、材质扩展模块。
+首版为 Challenge/Local Battle，保留上述后续扩展契约。为减少未使用抽象，固定步、碰撞采集与支撑检测集中在 `src/physics/PhysicsWorld.ts`；整杆控制与两种模式集中在 `src/core/GameSession.ts`，纯规则在 `src/gameplay/ShotResolver.ts`。相机轨道、选币聚焦和瞄准呈现在 `SceneManager`，指针生命周期、空白旋转、选币候选和当前币蓄力在 `PointerInput`；`GameApp` 串起 `selecting → ready → simulating`，并在 Battle 犯规换人后清空候选。关卡静态 JSON 经 `LevelValidator` 加载，导出 `src/content/levels.ts`。已接入Worker AI与木/石、金/铁材质；平台SDK未创建。
 
 共享尺寸、力度、固定步和超时均来自 `MaterialRegistry`。物理产生一次性 coin/wall 表现反馈，`drainFeedback()` 消费，永不参与规则计分。历史犯规原因用于提示，输入权限由 ready/selecting、session/revision/当前玩家决定。存档异常走可关闭 notice，棋盘异常走 error 恢复弹窗。
 

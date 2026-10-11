@@ -1,5 +1,8 @@
 import { LEVELS } from '../content/levels';
 import { generateRound, generateRevival } from '../content/CampaignGenerator';
+import { generateBattle, generateBattleRefill, generateOpening } from '../content/BattleGenerator';
+import { OpeningSession } from '../core/OpeningSession';
+import { AIClient, type AiShot } from '../ai/AIClient';
 import { GameSession } from '../core/GameSession';
 import { PointerInput, chargePower } from '../input/PointerInput';
 import { SaveAdapter, type SaveData } from '../platform/SaveAdapter';
@@ -8,7 +11,7 @@ import { Shell } from '../ui/Shell';
 import { SoundManager } from '../ui/SoundManager';
 import { COIN_THICKNESS } from '../physics/MaterialRegistry';
 import { tableContainsPoint } from '../physics/TableGeometry';
-import type { AimPreview, CampaignView, Direction, GameMode, GameView, LevelConfig, WorldFrame } from '../types/contracts';
+import type { AimPreview, BattleVariant, BattleView, CampaignView, Direction, GameMode, GameView, LevelConfig, WorldFrame } from '../types/contracts';
 
 interface CampaignRun {
   round: number;
@@ -20,6 +23,15 @@ interface CampaignRun {
   tutorial?: string;
 }
 
+interface BattleRun {
+  variant: BattleVariant;
+  level: LevelConfig;
+  results: BattleView;
+  arriving: boolean;
+  resultDelay: number;
+  advancing: boolean;
+}
+
 export class GameApp {
   private readonly save = new SaveAdapter(LEVELS.map(level => level.id));
   private progress: SaveData = this.save.read();
@@ -28,6 +40,22 @@ export class GameApp {
   private readonly scene: SceneManager;
   private readonly pointer: PointerInput;
   private session: GameSession | null = null;
+  private opening: OpeningSession | null = null;
+  private battle: BattleRun | null = null;
+  private readonly ai = new AIClient();
+  private aiEpoch = 0;
+  private aiPending = false;
+  private aiAge = 0;
+  private aiDecision: AiShot | number | null = null;
+  private get game(): GameSession | OpeningSession | null { return this.opening ?? this.session; }
+  private get gameView(): GameView | null {
+    const view = this.game?.view ?? null;
+    if (view && this.battle) {
+      view.battle ??= { ...this.battle.results, stage: 'playing' };
+      view.inputOwner = this.battle.variant === 'pve' && view.currentPlayer === 1 ? 'computer' : 'human';
+    }
+    return view;
+  }
   private aim: AimPreview | null = null;
   private charging = false;
   private impactIntensity = 0.5;
@@ -47,7 +75,7 @@ export class GameApp {
   constructor(root: HTMLElement, private readonly random: () => number = Math.random) {
     this.sound.enabled = this.progress.sound;
     this.shell = new Shell(root, LEVELS, {
-      start: (mode, levelId) => { void this.start(mode, levelId); },
+      start: (mode, levelId, variant) => { void this.start(mode, levelId, variant); },
       retry: () => { void this.retry(); },
       home: () => { void this.home(); },
       next: () => {},
@@ -57,8 +85,8 @@ export class GameApp {
     });
     this.scene = new SceneManager(this.shell.canvasHost);
     this.pointer = new PointerInput(this.scene, () => ({
-      view: this.menu || this.loading || this.scene.isIntroducing || this.run?.transition ? null : this.session?.view ?? null,
-      frame: this.session?.frame ?? null,
+      view: this.menu || this.loading || this.scene.isIntroducing || this.run?.transition || this.battle?.arriving || this.battle?.advancing || this.gameView?.inputOwner === 'computer' ? null : this.gameView,
+      frame: this.game?.frame ?? null,
     }), {
       shoot: (direction, power) => this.shoot(direction, power),
       pickCoin: id => this.pickCoin(id),
@@ -84,6 +112,9 @@ export class GameApp {
     this.lastFrame = null;
     this.previousView = null;
     this.sound.stopCurrentSounds();
+    this.cancelAI();
+    this.opening?.dispose();
+    this.opening = null;
     this.session?.dispose();
     this.session = null;
     this.shell.setError(null);
@@ -98,6 +129,7 @@ export class GameApp {
       this.menu = menu;
       this.scene.setLevel(level);
       this.scene.clearFocus();
+      if (this.battle) { this.scene.resetView(); this.battle.arriving = true; }
       this.scene.beginCoinArrival(menu ? [] : candidate.frame.coins.map(coin => coin.id));
       if (this.run) { this.run.transition = 'arriving'; this.run.error = false; }
       this.previousTime = 0;
@@ -116,10 +148,11 @@ export class GameApp {
     }
   }
 
-  private async start(mode: GameMode, levelId: string): Promise<void> {
+  private async start(mode: GameMode, levelId: string, variant: BattleVariant = 'pvp'): Promise<void> {
     if (this.loading) return;
     this.sound.unlock();
     if (mode === 'challenge') {
+      this.battle = null;
       this.run = { round: 1, revivesRemaining: 3, transition: 'arriving', error: false, seenIron: false, seenMarble: false };
       try {
         const level = generateRound(1, [], this.random);
@@ -128,17 +161,138 @@ export class GameApp {
       }
       catch (error) { this.failCampaign(error); }
     } else {
-      const level = LEVELS.find(item => item.id === levelId);
-      if (!level) return;
       this.run = null;
-      this.battleFirst = 0;
-      await this.load(mode, level, false);
+      try {
+        const level = generateBattle(this.random);
+        this.battle = { variant, level, results: { variant, stage: 'playing', distances: [null, null], fallen: [false, false], openingAttempt: 1 }, arriving: true, resultDelay: 0, advancing: false };
+        await this.loadOpening(generateOpening(level.table), variant);
+      } catch (error) { this.failBattle(error); }
     }
+  }
+
+  private cancelAI(): void {
+    this.aiEpoch++;
+    this.ai.cancel();
+    this.aiPending = false;
+    this.aiAge = 0;
+    this.aiDecision = null;
+  }
+
+  private failBattle(error: unknown): void {
+    this.cancelAI();
+    this.pointer.cancel();
+    this.game?.pause();
+    this.sound.suspend();
+    this.shell.setLoading(null);
+    this.shell.setError(`对战暂时无法继续，请重新开始。${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  private async loadOpening(level: LevelConfig, variant: BattleVariant): Promise<void> {
+    const generation = ++this.generation;
+    this.loading = true;
+    this.cancelAI(); this.pointer.cancel();
+    this.session?.dispose(); this.session = null;
+    this.opening?.dispose(); this.opening = null;
+    this.aim = null; this.lastFrame = null; this.previousView = null;
+    this.sound.stopCurrentSounds();
+    this.shell.setError(null); this.shell.setLoading('正在准备先手挑战…');
+    try {
+      await this.scene.initializeHand();
+      if (this.disposed || generation !== this.generation) return;
+      const candidate = await OpeningSession.create(level, variant);
+      if (this.disposed || generation !== this.generation) { candidate.dispose(); return; }
+      this.opening = candidate; this.currentLevel = level; this.menu = false;
+      this.scene.setLevel(level); this.scene.resetView();
+      this.scene.beginCoinArrival(candidate.frame.coins.map(coin => coin.id));
+      this.loading = false; this.previousTime = 0;
+      this.shell.setLoading(null); this.renderShell();
+    } catch (error) {
+      if (this.disposed || generation !== this.generation) return;
+      this.loading = false; this.menu = true; this.renderShell(); this.failBattle(error);
+    }
+  }
+
+  private advanceBattle(elapsed: number): void {
+    const battle = this.battle;
+    const game = this.game;
+    if (!battle || !game || game.view.phase === 'paused' || this.menu) return;
+    if (battle.arriving && !this.scene.isIntroducing) battle.arriving = false;
+    if (this.opening && this.opening.view.phase === 'complete' && !battle.advancing) {
+      battle.resultDelay += elapsed;
+      if (battle.resultDelay < 1.3) return;
+      const opening = this.opening;
+      const generation = this.generation;
+      battle.advancing = true; this.cancelAI(); this.pointer.cancel();
+      void (async () => {
+        const next = await opening.advance();
+        if (this.disposed || generation !== this.generation || this.battle !== battle || this.opening !== opening) return;
+        battle.advancing = false; battle.resultDelay = 0;
+        if (next) {
+          this.scene.setLevel(opening.level); this.scene.resetView();
+          this.scene.beginCoinArrival(opening.frame.coins.map(coin => coin.id));
+          battle.arriving = true; this.previousView = null; this.lastFrame = null;
+        } else if (opening.view.winner === 0 || opening.view.winner === 1) {
+          battle.results = { ...opening.view.battle!, stage: 'playing' };
+          this.battleFirst = opening.view.winner;
+          await this.load('battle', battle.level, false);
+        } else if (opening.view.phase === 'error') this.failBattle(opening.view.error);
+      })().catch(error => this.battle === battle && !this.disposed && this.failBattle(error));
+    } else if (this.session?.view.phase === 'refilling' && !battle.arriving) {
+      try {
+        this.cancelAI(); this.pointer.cancel(); this.aim = null;
+        const retained = this.session.frame.coins;
+        const level = generateBattleRefill(this.currentLevel!, retained, this.random);
+        if (!this.session.refill(level)) throw new Error('补币状态无效');
+        const oldIds = new Set(retained.map(coin => coin.id));
+        this.currentLevel = level; battle.level = level;
+        this.scene.setLevel(level, true);
+        this.scene.beginCoinArrival(level.coins.filter(coin => !oldIds.has(coin.id)).map(coin => coin.id));
+        battle.arriving = true; this.lastFrame = null; this.previousView = null;
+      } catch (error) { this.failBattle(error); }
+    }
+  }
+
+  private advanceAI(elapsed: number): void {
+    const game = this.game;
+    const view = this.gameView;
+    if (!this.battle || this.battle.variant !== 'pve' || !game || !view || view.currentPlayer !== 1
+      || !['ready', 'selecting'].includes(view.phase) || this.menu || this.loading || this.battle.arriving
+      || this.battle.advancing || this.scene.isIntroducing) return;
+    this.aiAge += elapsed;
+    if (this.aiDecision !== null && this.aiAge >= .8) {
+      const decision = this.aiDecision;
+      this.aiDecision = null; this.aiPending = false; this.aiAge = 0;
+      if (typeof decision !== 'number') {
+        if (view.canSelectCoin) {
+          if (!this.session?.selectCoin(decision.coinId)) { this.failBattle('电脑选币无效'); return; }
+          this.scene.focusCoin(decision.coinId);
+        } else if (view.activeCoinId !== decision.coinId) { this.failBattle('电脑接力币已变化'); return; }
+      }
+      const power = typeof decision === 'number' ? decision : decision.power;
+      if (game.shoot(typeof decision === 'number' ? { x: 0, z: -1 } : decision.direction, power)) {
+        this.impactIntensity = .3 + power * .7; this.sound.play('flick', power);
+      } else this.failBattle('电脑弹射状态无效');
+      return;
+    }
+    if (this.aiPending || this.aiAge < .4) return;
+    this.aiPending = true;
+    const epoch = this.aiEpoch;
+    const battle = this.battle;
+    try {
+      const request = this.opening ? this.ai.chooseOpening(this.opening.level) : this.ai.choose(this.session!.exportSnapshot());
+      void request.then(decision => {
+        if (this.disposed || epoch !== this.aiEpoch || this.game !== game || this.battle !== battle
+          || game.view.revision !== view.revision || game.view.phase !== view.phase) return;
+        this.aiDecision = decision;
+      }).catch(error => {
+        if (epoch === this.aiEpoch && !this.disposed && error?.name !== 'AbortError') this.failBattle(error);
+      });
+    } catch (error) { this.failBattle(error); }
   }
 
   private shoot(direction: Direction, power: number): void {
     this.sound.unlock();
-    if (!this.menu && !this.loading && !this.scene.isIntroducing && !this.run?.transition && this.session?.shoot(direction, power)) {
+    if (!this.menu && !this.loading && !this.scene.isIntroducing && !this.run?.transition && !this.battle?.arriving && !this.battle?.advancing && this.gameView?.inputOwner !== 'computer' && this.game?.shoot(direction, power)) {
       this.impactIntensity = 0.3 + power * 0.7;
       this.sound.play('flick', power);
     }
@@ -146,7 +300,7 @@ export class GameApp {
 
   /** Entry/turn launch choices stay editable until firing; relay targets stay fixed. */
   private pickCoin(id: string): void {
-    if (this.menu || this.loading || this.scene.isIntroducing || this.run?.transition || !this.session) return;
+    if (this.menu || this.loading || this.scene.isIntroducing || this.run?.transition || this.battle?.arriving || this.gameView?.inputOwner === 'computer' || !this.session) return;
     const view = this.session.view;
     if (!view.canSelectCoin || !['selecting', 'ready'].includes(view.phase) || !this.session.frame.coins.some((coin) => coin.id === id)) return;
     if (!this.session.selectCoin(id)) return;
@@ -156,6 +310,10 @@ export class GameApp {
 
   private async retry(): Promise<void> {
     if (this.loading) return;
+    if (this.battle) {
+      await this.start('battle', LEVELS[0].id, this.battle.variant);
+      return;
+    }
     if (this.run) {
       if (this.session?.view.phase === 'simulating' || (this.run.transition && !this.run.error && this.session?.view.phase !== 'paused')) return;
       await this.start('challenge', LEVELS[0].id);
@@ -180,11 +338,12 @@ export class GameApp {
     if (this.loading) return;
     this.sound.unlock();
     this.run = null;
+    this.battle = null;
     await this.load('challenge', LEVELS[0], true);
   }
 
   private renderShell(): void {
-    const view = this.menu ? null : this.session?.view ?? null;
+    const view = this.menu ? null : this.gameView;
     const campaign: CampaignView = {
       round: this.run?.round ?? 0, score: this.run ? this.session?.view.scores[0] ?? 0 : 0,
       bestScore: this.progress.bestScore, revivesRemaining: this.run?.revivesRemaining ?? 3,
@@ -272,13 +431,14 @@ export class GameApp {
   }
 
   private togglePause(): void {
-    if (this.menu || this.loading || !this.session) return;
+    if (this.menu || this.loading || !this.game) return;
     this.pointer.cancel();
     this.aim = null;
     this.lastFrame = null;
     this.sound.slide(0);
-    if (this.session.view.phase === 'paused') { this.session.resume(); this.sound.unlock(); }
-    else { this.session.pause(); this.sound.suspend(); }
+    this.cancelAI();
+    if (this.game.view.phase === 'paused') { this.game.resume(); this.sound.unlock(); }
+    else { this.game.pause(); this.sound.suspend(); }
     this.previousTime = 0;
   }
 
@@ -294,11 +454,12 @@ export class GameApp {
 
   private readonly onVisibility = (): void => {
     if (document.hidden) this.sound.suspend();
-    if (document.hidden && !this.menu && this.session) {
+    if (document.hidden && !this.menu && this.game) {
       this.pointer.cancel();
       this.aim = null;
       this.lastFrame = null;
-      this.session.pause();
+      this.cancelAI();
+      this.game.pause();
     }
     this.previousTime = 0;
   };
@@ -312,17 +473,18 @@ export class GameApp {
     if (this.disposed) return;
     const elapsed = this.previousTime ? Math.min((time - this.previousTime) / 1000, 0.1) : 0;
     this.previousTime = time;
-    if (this.session && !this.loading) {
-      if (!this.menu && this.session.view.phase !== 'paused') {
+    const game = this.game;
+    if (game && !this.loading) {
+      if (!this.menu && game.view.phase !== 'paused') {
         if (this.run?.transition === 'clearing') this.scene.advanceObstacleRemoval(elapsed);
         else for (const _id of this.scene.advanceCoinArrival(elapsed)) this.sound.play('land', 0.6);
         this.advanceCampaign();
       }
-      this.session.tick(elapsed);
-      for (const feedback of new Set(this.session.drainFeedback())) {
+      game.tick(elapsed);
+      for (const feedback of new Set(game.drainFeedback())) {
         if (!this.menu) this.sound.play(feedback, this.impactIntensity);
       }
-      const view = this.session.view;
+      const view = this.gameView!;
       if (!this.menu) {
         const previous = this.previousView;
         if (view.phase === 'selecting' && previous?.phase !== 'selecting') this.scene.clearFocus();
@@ -338,6 +500,8 @@ export class GameApp {
         }
         if (this.run && view.phase === 'complete') this.beginRoundTransition();
         this.previousView = view;
+        this.advanceBattle(elapsed);
+        this.advanceAI(elapsed);
         this.renderShell();
       }
       // The charge is presentation state: hold duration drives both the finger pose and the shot power.
@@ -347,7 +511,7 @@ export class GameApp {
       this.charging = !!charge;
       // Metallic scrape: track the fastest on-table mover while the shot is settling.
       let slide = 0;
-      const frame = this.session.frame;
+      const frame = this.game!.frame;
       if (!this.menu && view.phase === 'simulating' && this.lastFrame && elapsed > 0) {
         for (const coin of frame.coins) {
           const previous = this.lastFrame.coins.find((item) => item.id === coin.id);
@@ -360,7 +524,7 @@ export class GameApp {
       this.lastFrame = frame;
       if (view.phase === 'simulating') this.impactIntensity = Math.max(0.12, slide);
       this.sound.slide(this.menu ? 0 : slide);
-      this.scene.render(frame, this.menu ? null : view, this.aim);
+      this.scene.render(frame, this.menu ? null : this.gameView, this.aim);
     }
     this.animation = requestAnimationFrame(this.frame);
   };
@@ -374,6 +538,8 @@ export class GameApp {
     window.removeEventListener('pagehide', this.onPageHide);
     this.pointer.dispose();
     this.session?.dispose();
+    this.opening?.dispose();
+    this.ai.dispose();
     this.scene.dispose();
     this.shell.dispose();
     this.sound.dispose();

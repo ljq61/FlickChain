@@ -160,4 +160,23 @@ describe('real Rapier 3D world', () => {
     await expect(PhysicsWorld.create(level([['A', 0.58, 0], ['B', 0, 0]]))).rejects.toThrow(/桌边|贴边/);
     await expect(PhysicsWorld.create(level([['A', NaN, 0], ['B', 0, 0]]))).rejects.toThrow();
   });
+  it('restores a stacked settled world with support flags and exactly replays the next production shot', async () => {
+    const world = await PhysicsWorld.create(level());
+    let clone: PhysicsWorld | undefined;
+    try {
+      const bindings = (world as unknown as { coins: Map<string, { body: RAPIER.RigidBody }> }).coins;
+      const a = bindings.get('A')!.body, b = bindings.get('B')!.body, base = b.translation();
+      a.setTranslation({ x: base.x, y: base.y + COIN_THICKNESS + .05, z: base.z }, true);
+      for (let step = 0; step < 240; step++) world.step();
+      expect(world.isSettled()).toBe(true);
+      const snapshot = world.snapshot();
+      expect(snapshot.coins.find((coin) => coin.id === 'A')!.free).toBe(true);
+      clone = await PhysicsWorld.restore(snapshot);
+      expect(clone.frame).toEqual(world.frame); expect(clone.canRemoveSource('B')).toBe(false);
+      expect(clone.canRemoveSource('A')).toBe(true);
+      for (const candidate of [world, clone]) expect(candidate.applyShot('A', { x: -1, z: 0 }, .2)).toBe(true);
+      for (let step = 0; step < 300; step++) { expect(clone.step()).toEqual(world.step()); expect(clone.frame).toEqual(world.frame); }
+      expect(clone.isSettled()).toBe(world.isSettled());
+    } finally { clone?.dispose(); world.dispose(); }
+  });
 });

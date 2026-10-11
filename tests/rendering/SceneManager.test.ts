@@ -90,6 +90,52 @@ describe('campaign scene resource continuity', () => {
     expect(scene.getAimDirection().z).toBeCloseTo(direction.z, 10);
   });
 
+  it.each([[390, 844], [1280, 720]])('resets both opening trials to the whole-board bottom-to-top view at %s×%s', (width, height) => {
+    Object.defineProperties(host, { clientWidth: { value: width }, clientHeight: { value: height } });
+    const config: LevelConfig = { ...level(), obstacles: [], activeCoinId: 'start', coins: [{ id: 'start', x: 0, z: .64, materialId: 'standard' }] };
+    scene.setLevel(config);
+    vi.spyOn(scene.canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width, height } as DOMRect);
+    scene.render(frame(config), { ...ready, activeCoinId: 'start' }, null);
+    scene.orbitBy(480, 180); scene.focusCoin('start');
+    scene.resetView();
+    const opening: GameView = { ...ready, mode: 'battle', activeCoinId: 'start', battle: { variant: 'pvp', stage: 'opening', distances: [null, null], fallen: [false, false], openingAttempt: 1 } };
+    for (let step = 0; step < 60; step++) scene.render(frame(config), opening, null);
+    const resources = scene as unknown as { cameraFocus: THREE.Vector3; desiredFocus: THREE.Vector3; finger: THREE.Group; camera: THREE.PerspectiveCamera };
+    expect(scene.getAimDirection().x).toBeCloseTo(0, 10);
+    expect(scene.getAimDirection().z).toBeCloseTo(-1, 10);
+    expect(resources.cameraFocus.toArray()).toEqual([0, 0, 0]);
+    expect(resources.desiredFocus.toArray()).toEqual([0, 0, 0]);
+    expect(resources.finger.visible).toBe(true);
+    for (let angle = 0; angle < 360; angle += 10) {
+      const point = scene.projectToScreen({ x: .8 * Math.cos(angle * Math.PI / 180), y: .004, z: .8 * Math.sin(angle * Math.PI / 180) });
+      expect(point.x).toBeGreaterThan(0); expect(point.x).toBeLessThan(width);
+      expect(point.y).toBeGreaterThan(height * .22); expect(point.y).toBeLessThan(height * .8);
+    }
+    const trialPosition = resources.camera.position.clone();
+    const aim: AimPreview = { source: frame(config).coins[0].position, direction: { x: 0, z: -1 }, power: .5 };
+    scene.render(frame(config), opening, aim);
+    expect(resources.camera.position.equals(trialPosition)).toBe(true);
+  });
+
+  it('removes every human-control visual on computer ownership and restores it on the human turn', () => {
+    const config = level(); scene.setLevel(config);
+    const authoritative = frame(config);
+    const resources = scene as unknown as Resources & { activeHalo: THREE.Mesh; finger: THREE.Group; glowLight: THREE.PointLight; ironMaterial: THREE.Material; brassMaterial: THREE.Material };
+    scene.render(authoritative, ready, null);
+    expect(resources.finger.visible).toBe(true); expect(resources.activeHalo.visible).toBe(true);
+    for (const phase of ['ready', 'selecting'] as const) {
+      scene.render(authoritative, { ...ready, mode: 'battle', phase, inputOwner: 'computer' }, null);
+      expect(resources.finger.visible).toBe(false); expect(resources.activeHalo.visible).toBe(false);
+      expect(resources.glowLight.intensity).toBe(0);
+      expect(resources.coinMeshes.get('survivor')!.userData.body.material).toBe(resources.ironMaterial);
+      expect(resources.coinMeshes.get('new')!.userData.body.material).toBe(resources.brassMaterial);
+    }
+    scene.render(authoritative, { ...ready, inputOwner: 'human' }, null);
+    expect(resources.finger.visible).toBe(true); expect(resources.activeHalo.visible).toBe(true);
+    scene.render(authoritative, { ...ready, phase: 'refilling' }, null);
+    expect(resources.finger.visible).toBe(false); expect(resources.activeHalo.visible).toBe(false);
+  });
+
   it('keeps old cups on revival, drops newly created cups even without new coins, and lifts them on clearing', () => {
     const config = level(); scene.setLevel(config); scene.beginCoinArrival(config.coins.map((coin) => coin.id));
     for (let i = 0; i < 100; i++) scene.advanceCoinArrival(1 / 60);

@@ -14,6 +14,21 @@ interface CoinBinding {
 }
 export type PhysicsFeedback = 'coin' | 'wall';
 export interface PhysicsEvents { contacts: [string, string][]; fallenCoinIds: string[]; feedback: PhysicsFeedback[] }
+/** Rapier bytes plus the production bookkeeping that lives outside its world. */
+export interface PhysicsSnapshot {
+  version: string;
+  level: LevelConfig;
+  bytes: Uint8Array;
+  tableHandle: number;
+  coins: { id: string; materialId: CoinMaterialId; bodyHandle: number; colliderHandle: number; free: boolean; supportSteps: number }[];
+  fallen: string[];
+  frozen: boolean;
+  obstacles: [string, number][];
+  shotSourceId: string | null;
+  shotTargets: string[];
+  pendingImpactTargets: string[];
+  freshCoinIds: string[];
+}
 
 export class PhysicsWorld {
   private readonly world: RAPIER.World;
@@ -29,11 +44,29 @@ export class PhysicsWorld {
   private shotSourceId: string | null = null;
   private readonly shotTargets = new Set<string>();
   private readonly pendingImpactTargets = new Set<string>();
-  private constructor(private level: LevelConfig) {
+  private readonly freshCoins = new Set<string>();
+  private constructor(private level: LevelConfig, snapshot?: PhysicsSnapshot) {
+    if (snapshot) {
+      this.world = RAPIER.World.restoreSnapshot(snapshot.bytes);
+      this.events = new RAPIER.EventQueue(true);
+      this.tableCollider = this.world.getCollider(snapshot.tableHandle);
+      for (const coin of snapshot.coins) {
+        this.coins.set(coin.id, { materialId: coin.materialId, body: this.world.getRigidBody(coin.bodyHandle),
+          collider: this.world.getCollider(coin.colliderHandle), free: coin.free, supportSteps: coin.supportSteps });
+        this.colliderIds.set(coin.colliderHandle, coin.id);
+      }
+      for (const id of snapshot.fallen) this.fallen.add(id);
+      for (const [id, handle] of snapshot.obstacles) { this.obstacleIds.set(id, handle); this.obstacleHandles.add(handle); }
+      this.frozen = snapshot.frozen; this.shotSourceId = snapshot.shotSourceId;
+      for (const id of snapshot.shotTargets) this.shotTargets.add(id);
+      for (const id of snapshot.pendingImpactTargets) this.pendingImpactTargets.add(id);
+      for (const id of snapshot.freshCoinIds) this.freshCoins.add(id);
+      return;
+    }
     this.world = new RAPIER.World({ x: 0, y: PHYSICS_CONFIG.gravity, z: 0 });
+    this.events = new RAPIER.EventQueue(true);
     this.world.timestep = PHYSICS_CONFIG.fixedDt / PHYSICS_CONFIG.integrationSubsteps;
     this.world.numSolverIterations = PHYSICS_CONFIG.solverIterations;
-    this.events = new RAPIER.EventQueue(true);
     const tableDesc = level.table.shape === 'circle'
       ? RAPIER.ColliderDesc.cylinder(PHYSICS_CONFIG.tableThickness / 2, level.table.width / 2)
       : RAPIER.ColliderDesc.cuboid(level.table.width / 2, PHYSICS_CONFIG.tableThickness / 2, level.table.depth / 2);
@@ -69,6 +102,7 @@ export class PhysicsWorld {
       .setRestitution(material.restitution).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), body);
     this.coins.set(coin.id, { body, collider, materialId: coin.materialId, free: false, supportSteps: 0 });
     this.colliderIds.set(collider.handle, coin.id);
+    if (gap === 0) this.freshCoins.add(coin.id);
   }
   /** Retain every existing body exactly; additions start flat at the supported tabletop height.
    * No simulation runs here: round presentation must not perturb the settled survivor. */
@@ -129,6 +163,49 @@ export class PhysicsWorld {
     } catch (error) { instance.dispose(); throw error; }
   }
   static validate(level: LevelConfig): void { validateLevel(level); }
+  /** Export only a quiet world; step() has drained both event queues at this boundary. */
+  snapshot(): PhysicsSnapshot {
+    if (this.disposed || !this.isQuiet() || !this.snapshotSupported()) throw new Error('仅能导出静止且有支撑的物理世界');
+    return {
+      version: PHYSICS_CONFIG.version, level: structuredClone(this.level), bytes: this.world.takeSnapshot(),
+      tableHandle: this.tableCollider.handle,
+      coins: [...this.coins].map(([id, coin]) => ({ id, materialId: coin.materialId, bodyHandle: coin.body.handle,
+        colliderHandle: coin.collider.handle, free: coin.free, supportSteps: coin.supportSteps })),
+      fallen: [...this.fallen], frozen: this.frozen, obstacles: [...this.obstacleIds],
+      shotSourceId: this.shotSourceId, shotTargets: [...this.shotTargets], pendingImpactTargets: [...this.pendingImpactTargets],
+      freshCoinIds: [...this.freshCoins],
+    };
+  }
+  static async restore(input: PhysicsSnapshot): Promise<PhysicsWorld> {
+    const snapshot = structuredClone(input);
+    if (snapshot.version !== PHYSICS_CONFIG.version || !(snapshot.bytes instanceof Uint8Array) || snapshot.bytes.length === 0) throw new Error('物理快照版本或数据无效');
+    if (!Array.isArray(snapshot.coins) || !Array.isArray(snapshot.obstacles) || !Array.isArray(snapshot.freshCoinIds)
+      || !Array.isArray(snapshot.fallen) || !Array.isArray(snapshot.shotTargets) || !Array.isArray(snapshot.pendingImpactTargets)
+      || typeof snapshot.frozen !== 'boolean' || !Number.isFinite(snapshot.tableHandle)
+      || snapshot.coins.some((coin) => !coin || typeof coin.id !== 'string' || !coin.id || !Number.isFinite(coin.bodyHandle) || !Number.isFinite(coin.colliderHandle)
+        || !Number.isFinite(coin.supportSteps) || coin.supportSteps < 0 || typeof coin.free !== 'boolean' || (coin.materialId !== 'standard' && coin.materialId !== 'iron'))
+      || new Set(snapshot.coins.map((coin) => coin.id)).size !== snapshot.coins.length
+      || new Set(snapshot.coins.map((coin) => coin.bodyHandle)).size !== snapshot.coins.length
+      || new Set(snapshot.coins.map((coin) => coin.colliderHandle)).size !== snapshot.coins.length
+      || snapshot.obstacles.some((entry) => !Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string' || !Number.isFinite(entry[1]))
+      || [...snapshot.freshCoinIds, ...snapshot.fallen].some((id) => !snapshot.coins.some((coin) => coin.id === id))
+      || (snapshot.shotSourceId !== null && !snapshot.coins.some((coin) => coin.id === snapshot.shotSourceId))) throw new Error('快照映射无效');
+    // The authored level can contain removed coins; actual bodies and moved poses
+    // are restored exclusively from Rapier, never recreated from these configs.
+    validateLevel(snapshot.level, new Set(snapshot.level.coins.map((coin) => coin.id)), new Set(snapshot.level.obstacles.map((obstacle) => obstacle.id)));
+    initialization ??= RAPIER.init().catch((error) => { initialization = undefined; throw error; });
+    await initialization;
+    const instance = new PhysicsWorld(snapshot.level, snapshot);
+    try {
+      if (!instance.tableCollider?.isValid()) throw new Error('快照映射无效');
+      for (const coin of instance.coins.values()) {
+        if (!coin.body?.isValid() || !coin.collider?.isValid() || coin.collider.parent()?.handle !== coin.body.handle) throw new Error('快照硬币映射无效');
+      }
+      for (const handle of instance.obstacleHandles) if (!instance.world.getCollider(handle)?.isValid()) throw new Error('快照障碍映射无效');
+      if (!instance.isQuiet() || !instance.snapshotSupported()) throw new Error('快照不是静止且有支撑的物理世界');
+      return instance;
+    } catch (error) { instance.dispose(); throw error; }
+  }
   get frame(): WorldFrame {
     return {
       table: { ...this.level.table }, obstacles: this.level.obstacles.map((o) => ({ ...o })),
@@ -170,6 +247,7 @@ export class PhysicsWorld {
     const source = this.shotSourceId ? this.coins.get(this.shotSourceId) : undefined;
     const before = source ? new Map([...this.coins].map(([id, coin]) => [id, { velocity: { ...coin.body.linvel() }, position: { ...coin.body.translation() } }])) : null;
     this.world.step(this.events);
+    this.freshCoins.clear();
     const contacts: [string, string][] = [];
     const feedback: PhysicsFeedback[] = [];
     this.events.drainCollisionEvents((a, b, started) => {
@@ -287,6 +365,20 @@ export class PhysicsWorld {
     visiting.delete(id); return false;
   }
   allSupported(): boolean { return !this.disposed && [...this.coins].every(([id]) => this.fallen.has(id) || this.supportedChain(id)); }
+  private snapshotSupported(): boolean {
+    // Refill creates validated flat coins without a simulation step so the
+    // retained survivor never drifts. Rapier creates their manifolds next step.
+    // Admit only those exact fresh spawn poses to the export boundary; ordinary
+    // shot settlement continues to require real contact-chain support above.
+    return [...this.coins].every(([id, coin]) => {
+      if (this.fallen.has(id) || this.supportedChain(id)) return true;
+      if (!this.freshCoins.has(id)) return false;
+      const authored = this.level.coins.find((config) => config.id === id), p = coin.body.translation(), r = coin.body.rotation();
+      return authored !== undefined && Math.hypot(p.x - authored.x, p.z - authored.z) < 1e-6
+        && Math.abs(p.y - COIN_THICKNESS / 2) < 1e-6 && Math.abs(r.x) + Math.abs(r.y) + Math.abs(r.z) < 1e-6 && Math.abs(r.w - 1) < 1e-6
+        && tableClearance(this.level.table, p.x, p.z) > coinRadius(coin.materialId) + PHYSICS_CONFIG.initialClearance - 1e-6;
+    });
+  }
   isSettled(): boolean { return this.isQuiet() && this.allSupported(); }
   canRemoveSource(id: string): boolean {
     // Each survivor must retain a support chain to the fixed table without A.
@@ -320,12 +412,14 @@ export class PhysicsWorld {
     this.colliderIds.delete(coin.collider.handle);
     this.world.removeRigidBody(coin.body);
     this.coins.delete(id); this.fallen.delete(id);
+    this.freshCoins.delete(id);
     if (this.shotSourceId === id) { this.shotSourceId = null; this.shotTargets.clear(); this.pendingImpactTargets.clear(); }
   }
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true; this.coins.clear(); this.colliderIds.clear(); this.fallen.clear(); this.obstacleHandles.clear(); this.obstacleIds.clear();
     this.shotSourceId = null; this.shotTargets.clear(); this.pendingImpactTargets.clear();
+    this.freshCoins.clear();
     this.events.free(); this.world.free();
   }
 }

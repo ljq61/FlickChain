@@ -99,6 +99,49 @@ describe('Shell instant coin start UI', () => {
     expect(callbacks.next).not.toHaveBeenCalled();
   });
 
+  it('opens a secondary PVP/PVE choice before starting and restores home on return', () => {
+    const battle = root.querySelector<HTMLButtonElement>('[data-action="battle"]')!;
+    const pvp = root.querySelector<HTMLButtonElement>('[data-action="pvp"]')!;
+    const pve = root.querySelector<HTMLButtonElement>('[data-action="pve"]')!;
+    expect(battle.textContent).toBe('本地对战');
+    battle.click();
+    expect(callbacks.start).not.toHaveBeenCalled();
+    expect(root.querySelector<HTMLElement>('[data-el="main-actions"]')!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>('[data-el="battle-actions"]')!.hidden).toBe(false);
+    expect(document.activeElement).toBe(pvp);
+    shell.render(null, [], false);
+    expect(root.querySelector<HTMLElement>('[data-el="battle-actions"]')!.hidden).toBe(false);
+    pvp.click();
+    expect(callbacks.start).toHaveBeenCalledExactlyOnceWith('battle', level.id, 'pvp');
+    callbacks.start.mockClear();
+    pve.click();
+    expect(callbacks.start).toHaveBeenCalledExactlyOnceWith('battle', level.id, 'pve');
+    root.querySelector<HTMLButtonElement>('[data-action="battle-back"]')!.click();
+    expect(root.querySelector<HTMLElement>('[data-el="main-actions"]')!.hidden).toBe(false);
+    expect(document.activeElement).toBe(battle);
+    battle.click();
+    shell.render({ ...view('ready'), mode: 'battle' }, [], true);
+    shell.render(null, [], true);
+    expect(root.querySelector<HTMLElement>('[data-el="main-actions"]')!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>('[data-el="battle-actions"]')!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>('[data-el="live"]')!.textContent).toBe('');
+  });
+
+  it('keeps choices disabled during loading and returns a failed launch to the main menu', () => {
+    root.querySelector<HTMLButtonElement>('[data-action="battle"]')!.click();
+    shell.setLoading('正在准备对战');
+    const pve = root.querySelector<HTMLButtonElement>('[data-action="pve"]')!;
+    pve.click();
+    expect(callbacks.start).not.toHaveBeenCalled();
+    expect(pve.disabled).toBe(true);
+    shell.setError('无法准备棋盘');
+    root.querySelector<HTMLButtonElement>('[data-el="modal-secondary"]')!.click();
+    expect(callbacks.home).toHaveBeenCalledOnce();
+    shell.setError(null); shell.setLoading(null); shell.render(null, [], true);
+    expect(root.querySelector<HTMLElement>('[data-el="battle-actions"]')!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>('[data-el="main-actions"]')!.hidden).toBe(false);
+  });
+
   it('shows points and remaining opportunities, with the small round below the panel and best in the footer', () => {
     shell.render({ ...view('ready'), remaining: 8 }, [], true, false, campaign);
     expect(root.querySelector('[data-el="level-name"]')!.textContent).toBe('第 3 轮');
@@ -142,7 +185,7 @@ describe('Shell instant coin start UI', () => {
     expect(root.querySelector('[data-el="level-name"]')!.textContent).toBe('第 3 轮');
     shell.render({ ...view('ready'), mode: 'battle' }, [], true, false, campaign);
     expect(root.querySelector<HTMLElement>('[data-el="mode"]')!.hidden).toBe(false);
-    expect(root.querySelector('[data-el="mode"]')!.textContent).toBe('本地双人 · 公共棋盘');
+    expect(root.querySelector('[data-el="mode"]')!.textContent).toBe('双人抢 5 分');
   });
 
   it('preserves the current operation prompt beside first material explanations', () => {
@@ -307,7 +350,8 @@ describe('Shell instant coin start UI', () => {
 
   it('keeps the local battle result and scores', () => {
     root.querySelector<HTMLButtonElement>('[data-action="battle"]')!.click();
-    expect(callbacks.start).toHaveBeenCalledExactlyOnceWith('battle', level.id);
+    root.querySelector<HTMLButtonElement>('[data-action="pvp"]')!.click();
+    expect(callbacks.start).toHaveBeenCalledExactlyOnceWith('battle', level.id, 'pvp');
     shell.render({ ...view('ready'), mode: 'battle', scores: [3, 5], currentPlayer: 1, remaining: 6 }, [], true, false, campaign);
     expect(root.querySelector('[data-el="score-one-label"]')!.textContent).toBe('玩家一');
     expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('3');
@@ -325,5 +369,55 @@ describe('Shell instant coin start UI', () => {
     expect(root.querySelector('[data-el="modal-score"]')!.textContent).toContain('3  :  5');
     expect(root.querySelector('[data-el="modal-primary"]')!.textContent).toBe('再来一局');
     expect(root.querySelector('[data-el="modal-primary"]')!.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('shows both opening distances and a forfeited coin without treating the trial as match completion', () => {
+    const opening: GameView = {
+      ...view('ready'), mode: 'battle', canSelectCoin: false,
+      battle: { variant: 'pvp', stage: 'opening', distances: [null, null], fallen: [false, false], openingAttempt: 1 },
+    };
+    shell.render(opening, [], true);
+    expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('未弹');
+    expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('未弹');
+    expect(root.querySelector<HTMLElement>('[data-el="remaining-cell"]')!.hidden).toBe(true);
+    expect(root.querySelector('[data-el="level-name"]')!.textContent).toBe('比远争先');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('掉落放弃先手');
+    shell.render({ ...opening, phase: 'complete', battle: { ...opening.battle!, distances: [0.78, null] } }, [], true);
+    expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('78 cm');
+    expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('[data-el="pause"]')!.disabled).toBe(false);
+    shell.render({ ...opening, phase: 'complete', currentPlayer: 1, winner: 0, battle: { ...opening.battle!, distances: [0.78, null], fallen: [false, true] } }, [], true);
+    expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('掉落弃权');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('玩家二掉落，放弃先手');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('玩家一获得先手');
+    expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
+  });
+
+  it('labels the PVE computer turn honestly, retains compact settings and reports the correct winner', () => {
+    const battle: GameView = {
+      ...view('ready'), mode: 'battle', currentPlayer: 1, inputOwner: 'computer',
+      battle: { variant: 'pve', stage: 'playing', distances: [0.7, 0.8], fallen: [false, false], openingAttempt: 1 },
+    };
+    for (const phase of ['ready', 'selecting'] as const) {
+      shell.render({ ...battle, phase }, [], true);
+      expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('电脑思考中');
+      expect(root.querySelector('[data-el="prompt-description"]')!.textContent).not.toContain('按住');
+      expect(root.querySelector('[data-el="turn-label"]')!.textContent).toBe('电脑的回合');
+      expect(root.querySelector('[data-el="score-one-label"]')!.textContent).toBe('你');
+      expect(root.querySelector('[data-el="score-two-label"]')!.textContent).toBe('电脑');
+      expect(root.querySelector('[data-el="mode"]')!.textContent).toBe('人机抢 5 分');
+    }
+    shell.render({ ...battle, phase: 'refilling' }, [], true);
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('重新摆满九枚硬币');
+    shell.render({ ...battle, phase: 'paused' }, [], true);
+    expect(root.querySelector('[data-el="modal"]')!.getAttribute('data-variant')).toBe('settings');
+    expect(root.querySelector('[data-el="modal-primary"]')!.getAttribute('aria-label')).toBe('继续游戏');
+    shell.render({ ...battle, phase: 'complete', scores: [3, 5], winner: 1 }, [], true);
+    expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('电脑获胜');
+    expect(root.querySelector('[data-el="modal-score"]')!.textContent).toBe('你 3  :  5 电脑');
+    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain('先得 5 分');
+    expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(false);
+    shell.render({ ...battle, phase: 'complete', scores: [5, 3], winner: 0 }, [], true);
+    expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('你获胜');
   });
 });

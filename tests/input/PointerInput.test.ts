@@ -146,4 +146,43 @@ describe('public launch choices and relay pointer ownership', () => {
     expect(shoot).not.toHaveBeenCalled();
     expect(canvas.releasePointerCapture).toHaveBeenCalledWith(1);
   });
+
+  it('rejects all computer controls and cancels captured human holds immediately on ownership change', () => {
+    view.mode = 'battle'; view.inputOwner = 'computer';
+    for (const phase of ['ready', 'selecting'] as const) {
+      view.phase = phase;
+      tap(400);
+      pointer('pointerdown', 200); now += 700; pointer('pointerup', 200);
+      pointer('pointerdown', 650); pointer('pointermove', 680); pointer('pointerup', 680);
+    }
+    expect(pickCoin).not.toHaveBeenCalled(); expect(shoot).not.toHaveBeenCalled(); expect(orbit).not.toHaveBeenCalled();
+    expect(canvas.setPointerCapture).not.toHaveBeenCalled();
+    view.phase = 'ready'; view.inputOwner = 'human';
+    vi.mocked(canvas.hasPointerCapture).mockReturnValue(true);
+    pointer('pointerdown', 200); now += 3250; view.inputOwner = 'computer';
+    expect(input.charge()).toBeNull(); pointer('pointerup', 200);
+    expect(canvas.releasePointerCapture).toHaveBeenCalledWith(1);
+    expect(shoot).not.toHaveBeenCalled(); expect(chargeFailed).not.toHaveBeenCalled();
+  });
+
+  it('freezes opening orbit and launches along the default bottom-to-top axis', () => {
+    view.mode = 'battle'; view.canSelectCoin = false;
+    view.battle = { variant: 'pvp', stage: 'opening', distances: [null, null], fallen: [false, false], openingAttempt: 1 };
+    pointer('pointerdown', 650); pointer('pointermove', 680); pointer('pointerup', 680);
+    expect(orbit).not.toHaveBeenCalled(); expect(canvas.setPointerCapture).not.toHaveBeenCalled();
+    pointer('pointerdown', 200); now += 625; pointer('pointerup', 200);
+    expect(shoot).toHaveBeenCalledExactlyOnceWith({ x: 0, z: -1 }, .5);
+    expect(pickCoin).not.toHaveBeenCalled();
+    view.battle.stage = 'playing';
+    pointer('pointerdown', 650); pointer('pointermove', 680); pointer('pointerup', 680);
+    expect(orbit).toHaveBeenCalledWith(30, 0);
+  });
+
+  it('cannot continue a normal orbit after the opening stage takes ownership', () => {
+    pointer('pointerdown', 650);
+    view.battle = { variant: 'pvp', stage: 'opening', distances: [null, null], fallen: [false, false], openingAttempt: 1 };
+    vi.mocked(canvas.hasPointerCapture).mockReturnValue(true);
+    pointer('pointermove', 680); pointer('pointerup', 680);
+    expect(orbit).not.toHaveBeenCalled(); expect(canvas.releasePointerCapture).toHaveBeenCalledWith(1);
+  });
 });
