@@ -64,7 +64,7 @@ export class Shell {
       <div class="status-live" data-el="live" role="status" aria-live="polite" aria-atomic="true"></div>
       <aside class="notice-toast" data-el="notice" hidden aria-label="保存提示"><p data-el="notice-message" role="status"></p><button type="button" class="notice-dismiss" data-action="dismiss-notice" aria-label="关闭保存提示">关闭</button></aside>
       <div class="loading-layer" data-el="loading" hidden><div class="loading-card" role="status"><span class="loading-dot" aria-hidden="true"></span><p data-el="loading-message">正在准备棋盘</p></div></div>
-      <div class="modal-layer" data-el="modal-layer" hidden><section class="result-card" data-el="modal" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-description" tabindex="-1"><div class="bill-seal" aria-hidden="true">${COIN_ICON}</div><p class="eyebrow" data-el="modal-kicker">这一局</p><h2 id="result-title" data-el="modal-title"></h2><p id="result-description" data-el="modal-description"></p><div class="result-score" data-el="modal-score"></div><div class="modal-actions"><button type="button" class="primary-button" data-el="modal-primary" data-action="retry">再试一次</button><button type="button" class="secondary-button" data-el="modal-secondary" data-action="home">返回菜单</button><button type="button" class="text-button" data-el="modal-tertiary" data-action="home" hidden>返回菜单</button></div></section></div>`;
+      <div class="modal-layer" data-el="modal-layer" hidden><section class="result-card" data-el="modal" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-description" tabindex="-1"><div class="bill-seal" data-el="modal-seal" aria-hidden="true">${COIN_ICON}</div><p class="eyebrow" data-el="modal-kicker">这一局</p><h2 id="result-title" data-el="modal-title"></h2><p id="result-description" data-el="modal-description"></p><div class="result-score" data-el="modal-score"></div><div class="modal-actions"><button type="button" class="primary-button" data-el="modal-primary" data-action="retry">再试一次</button><button type="button" class="secondary-button" data-el="modal-secondary" data-action="home">返回菜单</button><button type="button" class="text-button" data-el="modal-tertiary" data-action="home" hidden>返回菜单</button></div></section></div>`;
     this.root.append(this.element);
     this.element.querySelectorAll<HTMLElement>('[data-el]').forEach((element) => this.elements.set(element.dataset.el!, element));
     const signal = this.events.signal;
@@ -223,6 +223,11 @@ export class Shell {
     const error = this.externalError ?? (view?.phase === 'error' ? view.error : null);
     const state = error ? 'error' : view && (['failed', 'paused', 'error'].includes(view.phase) || (view.mode === 'battle' && view.phase === 'complete')) ? view.phase : '';
     this.node('modal').dataset.variant = state === 'paused' ? 'settings' : 'result';
+    this.node('modal-seal').hidden = state === 'paused';
+    this.node('modal-kicker').hidden = state === 'paused';
+    this.node('modal-description').hidden = state === 'paused';
+    if (state === 'paused') this.node('modal').removeAttribute('aria-describedby');
+    else this.node('modal').setAttribute('aria-describedby', 'result-description');
     this.node('loading').hidden = !this.loading || !!state;
     if (this.loading) this.text('loading-message', this.loading);
     this.node('modal-layer').hidden = !state;
@@ -234,7 +239,6 @@ export class Shell {
       if (state !== 'paused') this.button('modal-tertiary', '返回菜单', 'home', true);
       if (state === 'paused') {
         title = '游戏设置';
-        description = '棋盘和分数都为你保留着。';
         this.button('modal-primary', '继续游戏', 'pause', false, PLAY_ICON);
         this.button('modal-secondary', '重新开始', 'retry', false, RESTART_ICON);
         this.button('modal-tertiary', '返回菜单', 'home', false, HOME_ICON);

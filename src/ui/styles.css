@@ -96,7 +96,9 @@ button svg { display: block; flex-shrink: 0; pointer-events: none; }
 .result-card > p:not(.eyebrow) { color: #795b38; font-size: 14px; line-height: 1.85; margin: 0; overflow-wrap: anywhere; }
 .result-score { white-space: pre-line; line-height: 1.65; padding: 16px 0; margin: 17px 0 0; border-top: 1px solid #c4a06a; border-bottom: 1px solid #c4a06a; font-family: var(--serif); font-size: 21px; font-weight: 600; color: #82521e; }
 .modal-actions { display: grid; gap: 11px; margin-top: 23px; }
-.result-card[data-variant="settings"] .modal-actions { display: flex; justify-content: center; gap: 15px; }
+.result-card[data-variant="settings"] { width: min(324px, 100%); padding: 22px 24px 20px; border-radius: 22px; }
+.result-card[data-variant="settings"] h2 { margin: 0; font-size: 26px; }
+.result-card[data-variant="settings"] .modal-actions { display: flex; justify-content: center; gap: 15px; margin-top: 18px; }
 .result-card .modal-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; min-height: 72px; padding: 18px; border-radius: 21px; flex-shrink: 0; }
 .modal-icon-button svg { width: 32px; height: 32px; }
 .result-card .text-button.modal-icon-button { border: 2px solid #efbf6c; background: linear-gradient(120deg, #4c2b18, #2e1a11 62%, #472813); color: #fff0ce; box-shadow: inset 0 0 0 2px rgba(53, 29, 13, .93), inset 0 0 0 3px rgba(255, 219, 143, .63), 0 3px 8px rgba(92, 52, 19, .15); }

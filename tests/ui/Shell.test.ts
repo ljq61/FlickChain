@@ -182,6 +182,11 @@ describe('Shell instant coin start UI', () => {
     expect(root.querySelector('[data-el="footer"] [data-action="retry"]')).toBeNull();
     shell.render(view('paused'), [], true, false, campaign);
     expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('游戏设置');
+    for (const name of ['modal-seal', 'modal-kicker', 'modal-description']) {
+      expect(root.querySelector<HTMLElement>(`[data-el="${name}"]`)!.hidden).toBe(true);
+    }
+    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toBe('');
+    expect(root.querySelector('[data-el="modal"]')!.hasAttribute('aria-describedby')).toBe(false);
     const primary = root.querySelector<HTMLButtonElement>('[data-el="modal-primary"]')!;
     const secondary = root.querySelector<HTMLButtonElement>('[data-el="modal-secondary"]')!;
     const tertiary = root.querySelector<HTMLButtonElement>('[data-el="modal-tertiary"]')!;
@@ -210,6 +215,10 @@ describe('Shell instant coin start UI', () => {
     shell.render(view('paused'), [], true, false, campaign);
     shell.render({ ...view('failed'), foulReasons: ['MISS'] }, [], true, false, campaign);
     expect(root.querySelector('[data-el="modal"]')!.getAttribute('data-variant')).toBe('result');
+    for (const name of ['modal-seal', 'modal-kicker', 'modal-description']) {
+      expect(root.querySelector<HTMLElement>(`[data-el="${name}"]`)!.hidden).toBe(false);
+    }
+    expect(root.querySelector('[data-el="modal"]')!.getAttribute('aria-describedby')).toBe('result-description');
     for (const [button, label] of [[primary, '复活继续'], [secondary, '重新开始'], [tertiary, '返回菜单']] as const) {
       expect(button.textContent).toBe(label);
       expect(button.querySelector('svg')).toBeNull();
