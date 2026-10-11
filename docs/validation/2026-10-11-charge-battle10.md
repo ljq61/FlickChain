@@ -18,7 +18,7 @@ PVP/PVE都先得10分获胜。初始随机9枚金币/铁币、1–5杯、随机�
 
 使用CUA鼠标操作生产预览127.0.0.1:4174，未注入游戏状态。1024×720比远开局按住2400ms，实测100%蓄力条在手左侧（x479–493），满力绿黄红可见；释放后和AI回合隐藏。PVE电脑到5分仍继续，9分时8枚在桌，表明补币后保持分数并继续得分；最终真实0:10、电脑获胜，结算说明先得10分。
 
-390×844进入PVP显示“双人抢10分”；单人选币后实测100%手左侧条完整显示，2400ms释放正常弹射。重开后3900ms长按达到超时，选中硬币留在原位，继续提示蓄力，条hidden=true；没有发射。设置与返回/重开按实际界面执行。控制台无error，仅既有Rapier初始化参数弃用warning。
+390×844进入PVP显示“双人抢10分”；单人选币后实测100%手左侧条完整显示，2400ms释放正常弹射。重开后3900ms长按达到超时，选中硬币留在原位，继续提示蓄力，条hidden=true；没有发射。再次按住200ms后正常弹射，确认需要重新蓄力。设置与返回/重开按实际界面执行。控制台无error，仅既有Rapier初始化参数弃用warning。
 
 截图：/private/tmp/flickchain-charge-meter-desktop.jpg、/private/tmp/flickchain-charge-meter-mobile.jpg、/private/tmp/flickchain-pve10-local-victory.jpg。
 
@@ -26,4 +26,6 @@ PVP/PVE都先得10分获胜。初始随机9枚金币/铁币、1–5杯、随机�
 
 手机尺寸检查为桌面浏览器鼠标，不能替代真实手机触摸、音频及性能验收。随机棋盘不保证任意残局可全链解；PVP完整10分实测由生产物理自动化覆盖，浏览器检查了入口及交互。CrazyGames Preview/正式发布不在本次范围。
 
-本次GitHub main/Pages发布验证待完成；随后补记实际提交、Actions和公开资源校验。
+游戏提交f8505b14fc8a49340912871623a99d882eafa66e已推送main；Actions [38152262250](https://github.com/ljq61/FlickChain/actions/runs/38152262250)测试、构建及Pages部署全部成功。公开站点[一弹到底](https://ljq61.github.io/FlickChain/)的主脚本/CSS/Worker/模型/音乐均HTTP200，正确MIME且逐字节匹配本地dist。主脚本SHA-256为042162f097cbe31d9bd537364ab4ebfbb424f5d2d96d490849e3eb455aab6342，Worker为274260ab275e375488ba4abb43325998d56c98908bff44fe5522bdb627fdef29。
+
+公开浏览器已确认菜单10分、2400ms真实满力蓄力条、松手及AI隐藏；PVE越过5分继续，并实际操作设置暂停/恢复。7分后换至人类，真实弹射掉币后保留0:7并补币，电脑继续到0:10、显示电脑获胜及10分说明。控制台无error。线上截图：/private/tmp/flickchain-charge-meter-published.jpg、/private/tmp/flickchain-pve10-published-victory.jpg。后续文档提交只补充发布证据，不改变上述运行资源。
