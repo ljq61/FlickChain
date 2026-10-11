@@ -10,6 +10,8 @@ import { TavernEnvironment } from './TavernEnvironment';
 
 const TABLE_THICKNESS = PHYSICS_CONFIG.tableThickness;
 const GLOW_COLOR = 0xff9d42;
+const CHARGE_METER_WIDTH = 14;
+const CHARGE_METER_HEIGHT = 84;
 
 function woodTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -175,6 +177,9 @@ export class SceneManager {
   private readonly activeHalo = new THREE.Mesh(new THREE.TorusGeometry(COIN_RADIUS * 1.28, 0.0009, 6, 64), new THREE.MeshBasicMaterial({ color: 0xffe1a0, transparent: true, opacity: 0.9, depthWrite: false }));
   private readonly glowLight = new THREE.PointLight(GLOW_COLOR, 0, 0.45, 2);
   private readonly finger = new FlickFinger();
+  private readonly chargeMeter = document.createElement('div');
+  private readonly chargeMeterFill = document.createElement('div');
+  private handMeterBounds: THREE.Vector3[] | null = null;
   private readonly arrival = new CoinArrival();
   private readonly observer: ResizeObserver;
   private readonly cameraFocus = new THREE.Vector3();
@@ -205,6 +210,19 @@ export class SceneManager {
     this.canvas.className = 'game-canvas';
     this.canvas.setAttribute('aria-label', '三维桌面棋盘，空白处拖动旋转视角；点选硬币直接开始，按住硬币后方的手指蓄力，松手弹射');
     this.host.append(this.canvas);
+    this.chargeMeter.className = 'charge-meter';
+    this.chargeMeter.hidden = true;
+    this.chargeMeter.setAttribute('role', 'progressbar');
+    this.chargeMeter.setAttribute('aria-label', '弹射蓄力');
+    this.chargeMeter.setAttribute('aria-valuemin', '0');
+    this.chargeMeter.setAttribute('aria-valuemax', '100');
+    this.chargeMeter.setAttribute('aria-valuenow', '0');
+    const track = document.createElement('div');
+    track.className = 'charge-meter-track';
+    this.chargeMeterFill.className = 'charge-meter-fill';
+    track.append(this.chargeMeterFill);
+    this.chargeMeter.append(track);
+    this.host.append(this.chargeMeter);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const room = new RoomEnvironment();
@@ -245,6 +263,7 @@ export class SceneManager {
 
   /** Both opening trials use the same bottom-to-top axis and whole-table camera. */
   resetView(): void {
+    this.chargeMeter.hidden = true;
     this.orbitYaw = 0;
     this.orbitPitch = 0.75;
     this.focusId = null;
@@ -276,9 +295,10 @@ export class SceneManager {
   getFingerHitPoints(): Vec3[] { return this.finger.getHitPoints(); }
 
   focusCoin(id: string | null): void { this.focusId = id; }
-  clearFocus(): void { this.focusId = null; }
+  clearFocus(): void { this.focusId = null; this.chargeMeter.hidden = true; }
 
   beginCoinArrival(ids: string[]): void {
+    this.chargeMeter.hidden = true;
     this.arrival.begin(ids, this.reducedMotion.matches);
     this.obstacleTransition.beginArrival(this.pendingObstacleIds, this.reducedMotion.matches);
     this.pendingObstacleIds = [];
@@ -290,12 +310,14 @@ export class SceneManager {
   }
 
   beginObstacleRemoval(): void {
+    this.chargeMeter.hidden = true;
     this.obstacleTransition.beginRemoval([...this.obstacleMeshes.keys()], this.reducedMotion.matches);
   }
   get isRemovingObstacles(): boolean { return this.obstacleTransition.removing; }
   advanceObstacleRemoval(seconds: number): void { this.obstacleTransition.advanceRemoval(seconds); }
 
   setLevel(level: LevelConfig, preserveFocus = false): void {
+    this.chargeMeter.hidden = true;
     this.arrival.begin([]);
     this.obstacleTransition.reset();
     this.pendingObstacleIds = [];
@@ -513,8 +535,48 @@ export class SceneManager {
     if (this.finger.visible) {
       this.finger.setPose({ x: activeX, z: activeZ }, this.getFingerDirection(), aim?.power ?? 0,
         this.reducedMotion.matches ? 0 : performance.now() / 1000);
+      this.cacheHandMeterBounds();
     }
+    this.updateChargeMeter(aim);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Sample the loaded hand once; only eight silhouette corners need projecting each frame. */
+  private cacheHandMeterBounds(): void {
+    if (this.handMeterBounds) return;
+    const points = this.finger.getHitPoints();
+    if (!points.length) return;
+    const box = new THREE.Box3();
+    for (const point of points) {
+      if (!Number.isFinite(point.x + point.y + point.z)) continue;
+      box.expandByPoint(this.finger.worldToLocal(new THREE.Vector3(point.x, point.y, point.z)));
+    }
+    if (box.isEmpty()) return;
+    this.handMeterBounds = [];
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+      this.handMeterBounds.push(new THREE.Vector3(x, y, z));
+    }
+  }
+
+  private updateChargeMeter(aim: AimPreview | null): void {
+    if (!aim || !this.finger.visible || !Number.isFinite(aim.power) || !this.handMeterBounds) { this.chargeMeter.hidden = true; return; }
+    const canvasRect = this.canvas.getBoundingClientRect();
+    if (canvasRect.width < CHARGE_METER_WIDTH + 16 || canvasRect.height < CHARGE_METER_HEIGHT + 16) { this.chargeMeter.hidden = true; return; }
+    const projected = this.handMeterBounds.map((point) => point.clone().applyMatrix4(this.finger.matrixWorld).project(this.camera));
+    if (projected.some((point) => !Number.isFinite(point.x + point.y + point.z) || point.z < -1 || point.z > 1)) { this.chargeMeter.hidden = true; return; }
+    const left = Math.min(...projected.map((point) => (point.x + 1) * canvasRect.width / 2));
+    const top = Math.min(...projected.map((point) => (1 - point.y) * canvasRect.height / 2));
+    const bottom = Math.max(...projected.map((point) => (1 - point.y) * canvasRect.height / 2));
+    const hostRect = this.host.getBoundingClientRect();
+    const x = THREE.MathUtils.clamp(left - CHARGE_METER_WIDTH - 12, 8, canvasRect.width - CHARGE_METER_WIDTH - 8) + canvasRect.left - hostRect.left;
+    const y = THREE.MathUtils.clamp((top + bottom - CHARGE_METER_HEIGHT) / 2, 8, canvasRect.height - CHARGE_METER_HEIGHT - 8) + canvasRect.top - hostRect.top;
+    const power = THREE.MathUtils.clamp(aim.power, 0, 1);
+    this.chargeMeter.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    // Clip a fixed full-height gradient, so low charge remains green and grows into yellow/red.
+    this.chargeMeterFill.style.clipPath = `inset(${(1 - power) * 100}% 0 0)`;
+    const percent = String(Math.round(power * 100));
+    if (this.chargeMeter.getAttribute('aria-valuenow') !== percent) this.chargeMeter.setAttribute('aria-valuenow', percent);
+    this.chargeMeter.hidden = false;
   }
 
   projectToTable(clientX: number, clientY: number): { x: number; z: number } | null {
@@ -609,6 +671,7 @@ export class SceneManager {
     this.contact.dispose();
     this.environment.dispose();
     this.renderer.dispose();
+    this.chargeMeter.remove();
     this.canvas.remove();
   }
 }

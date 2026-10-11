@@ -1,4 +1,4 @@
-import type { CoinConfig, CoinTransform, LevelConfig, ObstacleConfig, TableConfig } from '../types/contracts';
+import type { BattleVariant, CoinConfig, CoinTransform, LevelConfig, ObstacleConfig, TableConfig } from '../types/contracts';
 import { coinRadius, PHYSICS_CONFIG } from '../physics/MaterialRegistry';
 import { tableClearance } from '../physics/TableGeometry';
 import { obstacleDistance, validateLevel } from './LevelValidator';
@@ -32,8 +32,8 @@ function place(table: TableConfig, random: () => number, accepts: (point: Point)
   throw new Error('对战桌面没有足够的安全生成位置');
 }
 function addCoins(table: TableConfig, coins: CoinConfig[], obstacles: ObstacleConfig[], random: () => number,
-  nextId: () => string): void {
-  while (coins.length < BATTLE_COIN_COUNT) {
+  nextId: () => string, targetCount = BATTLE_COIN_COUNT): void {
+  while (coins.length < targetCount) {
     const materialId = unit(random) < 0.5 ? 'standard' : 'iron';
     const radius = coinRadius(materialId);
     const point = place(table, random, (p) => tableClearance(table, p.x, p.z) > radius + PHYSICS_CONFIG.initialClearance
@@ -54,11 +54,13 @@ export function generateBattle(random: () => number = Math.random): LevelConfig 
   }
   const coins: CoinConfig[] = [];
   addCoins(table, coins, obstacles, random, () => `${prefix}-coin-${coins.length}`);
-  return validateLevel({ schemaVersion: 1, id: prefix, name: '本地对战', lesson: '失误换手，先得 5 分获胜',
+  return validateLevel({ schemaVersion: 1, id: prefix, name: '本地对战', lesson: '失误换手，先得 10 分获胜',
     table, obstacles, coins, activeCoinId: coins[0].id });
 }
-/** Preserve the settled survivor and all cups, filling the same table back to nine coins. */
-export function generateBattleRefill(level: LevelConfig, retained: CoinTransform[], random: () => number = Math.random): LevelConfig {
+/** Keep the settled board: PVP fills to nine; PVE adds exactly eight new coins. */
+export function generateBattleRefill(level: LevelConfig, retained: CoinTransform[], random: () => number = Math.random,
+  variant: BattleVariant = 'pvp'): LevelConfig {
+  if (variant !== 'pvp' && variant !== 'pve') throw new Error('无效对战类型');
   if (retained.length > 1) throw new Error('对战补币只能保留零或一枚存活硬币');
   const prefix = `battle-${++sequence}-refill`;
   const table = { ...level.table }, obstacles = level.obstacles.map((glass) => ({ ...glass }));
@@ -74,7 +76,7 @@ export function generateBattleRefill(level: LevelConfig, retained: CoinTransform
     do { id = `${prefix}-coin-${index++}`; } while (reserved.has(id));
     reserved.add(id); return id;
   };
-  addCoins(table, coins, obstacles, random, nextId);
+  addCoins(table, coins, obstacles, random, nextId, variant === 'pve' ? retained.length + 8 : BATTLE_COIN_COUNT);
   return validateLevel({ ...level, id: prefix, coins, table, obstacles, activeCoinId: coins[0].id },
     new Set(retained.map((coin) => coin.id)), new Set(obstacles.map((glass) => glass.id)));
 }

@@ -24,6 +24,9 @@ button svg { display: block; flex-shrink: 0; pointer-events: none; }
 .flick-shell::after { content: ''; position: absolute; z-index: 1; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(10, 12, 13, .25), transparent 26%, transparent 69%, rgba(10, 12, 13, .58)); }
 .table-scene { position: absolute; z-index: 0; inset: 0; pointer-events: auto; }
 .game-canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; user-select: none; }
+.charge-meter { position: absolute; z-index: 2; top: 0; left: 0; width: 14px; height: 84px; padding: 0; border: 1px solid #d4aa64; border-radius: 7px; background: linear-gradient(90deg, #33271b, #756039 50%, #33271b); box-shadow: 0 2px 8px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 228, 164, .16); pointer-events: none; user-select: none; }
+.charge-meter-track { position: absolute; inset: 3px; overflow: hidden; border-radius: 3px; background: #171a16; box-shadow: inset 0 1px 3px rgba(0, 0, 0, .65); }
+.charge-meter-fill { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(to top, #66b67b 0%, #91c467 26%, #f0ca55 52%, #ef9e4b 74%, #dd6657 100%); clip-path: inset(100% 0 0); }
 .topbar { position: absolute; z-index: 4; top: max(26px, env(safe-area-inset-top)); left: 40px; right: 40px; display: flex; align-items: flex-start; justify-content: space-between; pointer-events: none; }
 .corner-controls { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-left: auto; pointer-events: none; }
 .brand { display: flex; align-items: center; gap: 10px; color: #f8dc9c; }
@@ -56,6 +59,8 @@ button svg { display: block; flex-shrink: 0; pointer-events: none; }
 .button-chevron { width: 24px; height: 24px; }
 .menu-progress { display: flex; justify-content: center; align-items: center; gap: 13px; margin: 7px 0 0; text-align: center; font-size: 14px; color: #ead7b5; line-height: 1.5; text-shadow: 0 2px 8px #100c08; }
 .menu-progress::before, .menu-progress::after { content: ''; width: 27px; height: 1px; background: #b17d3e; }
+.battle-menu .menu-progress { display: block; }
+.battle-menu .menu-progress::before, .battle-menu .menu-progress::after { display: none; }
 .battle-menu-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 1px; text-shadow: 0 2px 8px #100c08; }
 .battle-menu-heading h2 { margin: 0; font-family: var(--serif); font-size: 23px; font-weight: 600; letter-spacing: .05em; }
 .menu-back { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 10px; border-radius: 50%; }

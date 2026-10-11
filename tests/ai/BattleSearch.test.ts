@@ -46,6 +46,22 @@ describe('production snapshot AI search', () => {
       expect(Number.isFinite(result.shot.power)).toBe(true);
     } finally { game.dispose(); }
   });
+  it.each([5, 9])('replays a ten-point PVE decision from %s points without a five-point cutoff', async (score) => {
+    const game = await GameSession.create(board(), 'battle', 1, 10);
+    try {
+      const snapshot = game.exportSnapshot(); snapshot.view.scores = [6, score];
+      const found = await searchBattle(snapshot);
+      expect(found.successes).toBeGreaterThan(0);
+      const replay = await GameSession.restore(snapshot);
+      try {
+        expect(replay.selectCoin(found.shot.coinId)).toBe(true);
+        expect(replay.shoot(found.shot.direction, found.shot.power)).toBe(true); settle(replay);
+        expect(replay.view.lastResult?.outcome).toBe('SUCCESS');
+        expect(replay.view).toMatchObject({ battleWinScore: 10, scores: [6, score + 1],
+          phase: score === 9 ? 'complete' : 'ready', winner: score === 9 ? 1 : null });
+      } finally { replay.dispose(); }
+    } finally { game.dispose(); }
+  }, 10000);
   it('replays bounded decisions on random mixed-material boards without mutating live worlds', async () => {
     for (let seed = 1; seed <= 8; seed++) {
       let state = seed * 8111;

@@ -136,6 +136,83 @@ describe('campaign scene resource continuity', () => {
     expect(resources.finger.visible).toBe(false); expect(resources.activeHalo.visible).toBe(false);
   });
 
+  it.each([[320, 568], [390, 844], [1280, 720]])('anchors an upward charge fill left of the hand, follows the camera and clamps inside %s×%s', (width, height) => {
+    Object.defineProperties(host, { clientWidth: { value: width }, clientHeight: { value: height } });
+    vi.spyOn(scene.canvas, 'getBoundingClientRect').mockReturnValue({ left: 37, top: 19, width, height } as DOMRect);
+    vi.spyOn(host, 'getBoundingClientRect').mockReturnValue({ left: 37, top: 19, width, height } as DOMRect);
+    const config = level(); scene.setLevel(config);
+    const finger = (scene as unknown as { finger: THREE.Group & { getHitPoints(): { x: number; y: number; z: number }[] } }).finger;
+    finger.position.set(.3, 0, .4); finger.updateMatrixWorld(true);
+    const samples = vi.spyOn(finger, 'getHitPoints').mockImplementation(() => [
+      { x: .24, y: .01, z: .28 }, { x: .36, y: .06, z: .48 },
+    ]);
+    const authoritative = frame(config);
+    const meter = host.querySelector<HTMLElement>('[role="progressbar"]')!;
+    const fill = meter.querySelector<HTMLElement>('.charge-meter-fill')!;
+    const aim: AimPreview = { source: authoritative.coins[0].position, direction: { x: 0, z: -1 }, power: .25 };
+    scene.render(authoritative, ready, null);
+    expect(meter.hidden).toBe(true);
+    scene.render(authoritative, ready, aim);
+    expect(meter.hidden).toBe(false);
+    expect(meter.getAttribute('aria-label')).toBe('弹射蓄力');
+    expect(meter.hasAttribute('aria-live')).toBe(false);
+    expect(meter.getAttribute('aria-valuenow')).toBe('25');
+    expect(fill.style.clipPath).toBe('inset(75% 0 0)');
+    const coordinates = () => meter.style.transform.match(/translate3d\(([-\d.]+)px, ([-\d.]+)px, 0\)/)!.slice(1).map(Number);
+    const first = coordinates();
+    const handLeft = Math.min(...samples.mock.results[0].value!.map((point: { x: number; y: number; z: number }) => scene.projectToScreen(point).x)) - 37;
+    expect(first[0] + 14).toBeLessThan(handLeft);
+    expect(first[0]).toBeGreaterThanOrEqual(8); expect(first[0] + 14).toBeLessThanOrEqual(width - 8);
+    expect(first[1]).toBeGreaterThanOrEqual(8); expect(first[1] + 84).toBeLessThanOrEqual(height - 8);
+    scene.render(authoritative, ready, { ...aim, power: .6 });
+    expect(fill.style.clipPath).toBe('inset(40% 0 0)');
+    expect(meter.getAttribute('aria-valuenow')).toBe('60');
+    scene.orbitBy(100, 20);
+    scene.render(authoritative, ready, { ...aim, power: 1 });
+    expect(coordinates()).not.toEqual(first);
+    expect(fill.style.clipPath).toBe('inset(0% 0 0)');
+    expect(meter.getAttribute('aria-valuenow')).toBe('100');
+    finger.position.x = -3; finger.updateMatrixWorld(true);
+    scene.render(authoritative, ready, aim);
+    const edge = coordinates();
+    expect(edge[0]).toBeGreaterThanOrEqual(8); expect(edge[0] + 14).toBeLessThanOrEqual(width - 8);
+    expect(edge[1]).toBeGreaterThanOrEqual(8); expect(edge[1] + 84).toBeLessThanOrEqual(height - 8);
+    expect(samples).toHaveBeenCalledOnce();
+  });
+
+  it('hides the charge meter on release, cancellation, overlays, AI, arrival and missing hand, then removes it on disposal', () => {
+    const width = 390, height = 844;
+    Object.defineProperties(host, { clientWidth: { value: width }, clientHeight: { value: height } });
+    vi.spyOn(scene.canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width, height } as DOMRect);
+    const config = level(); scene.setLevel(config);
+    const finger = (scene as unknown as { finger: THREE.Group & { getHitPoints(): { x: number; y: number; z: number }[] } }).finger;
+    vi.spyOn(finger, 'getHitPoints').mockReturnValue([{ x: -.06, y: .01, z: .02 }, { x: .06, y: .06, z: .22 }]);
+    const authoritative = frame(config);
+    const aim: AimPreview = { source: authoritative.coins[0].position, direction: { x: 0, z: -1 }, power: .75 };
+    const meter = host.querySelector<HTMLElement>('[role="progressbar"]')!;
+    scene.render(authoritative, ready, aim); expect(meter.hidden).toBe(false);
+    scene.render(authoritative, ready, null); expect(meter.hidden).toBe(true);
+    for (const phase of ['paused', 'simulating', 'complete', 'failed', 'refilling', 'selecting', 'error'] as const) {
+      scene.render(authoritative, ready, aim); expect(meter.hidden).toBe(false);
+      scene.render(authoritative, { ...ready, phase }, aim); expect(meter.hidden).toBe(true);
+    }
+    scene.render(authoritative, { ...ready, inputOwner: 'computer' }, aim); expect(meter.hidden).toBe(true);
+    scene.render(authoritative, null, aim); expect(meter.hidden).toBe(true);
+    scene.render({ ...authoritative, coins: [] }, ready, aim); expect(meter.hidden).toBe(true);
+    scene.render(authoritative, ready, { ...aim, power: NaN }); expect(meter.hidden).toBe(true);
+    scene.render(authoritative, ready, aim); expect(meter.hidden).toBe(false);
+    scene.clearFocus(); expect(meter.hidden).toBe(true);
+    scene.render(authoritative, ready, aim); expect(meter.hidden).toBe(false);
+    scene.resetView(); expect(meter.hidden).toBe(true);
+    scene.render(authoritative, ready, aim); expect(meter.hidden).toBe(false);
+    scene.setLevel(config); expect(meter.hidden).toBe(true);
+    scene.beginCoinArrival(config.coins.map((coin) => coin.id));
+    scene.render(authoritative, ready, aim); expect(meter.hidden).toBe(true);
+    for (let i = 0; i < 100; i++) scene.advanceCoinArrival(1 / 60);
+    scene.render(authoritative, ready, aim); expect(meter.hidden).toBe(false);
+    scene.dispose(); scene.dispose(); expect(meter.isConnected).toBe(false);
+  });
+
   it('keeps old cups on revival, drops newly created cups even without new coins, and lifts them on clearing', () => {
     const config = level(); scene.setLevel(config); scene.beginCoinArrival(config.coins.map((coin) => coin.id));
     for (let i = 0; i < 100; i++) scene.advanceCoinArrival(1 / 60);

@@ -52,6 +52,7 @@ export class GameApp {
     const view = this.game?.view ?? null;
     if (view && this.battle) {
       view.battle ??= { ...this.battle.results, stage: 'playing' };
+      view.battleWinScore ??= 10;
       view.inputOwner = this.battle.variant === 'pve' && view.currentPlayer === 1 ? 'computer' : 'human';
     }
     return view;
@@ -108,6 +109,7 @@ export class GameApp {
     const generation = ++this.generation;
     this.loading = true;
     this.pointer.cancel();
+    this.scene.clearFocus();
     this.aim = null;
     this.lastFrame = null;
     this.previousView = null;
@@ -122,7 +124,8 @@ export class GameApp {
     try {
       await this.scene.initializeHand();
       if (this.disposed || generation !== this.generation) return;
-      const candidate = await GameSession.create(level, mode, mode === 'battle' ? this.battleFirst : 0);
+      const candidate = await GameSession.create(level, mode, mode === 'battle' ? this.battleFirst : 0,
+        10);
       if (this.disposed || generation !== this.generation) { candidate.dispose(); return; }
       this.session = candidate;
       this.currentLevel = level;
@@ -191,6 +194,7 @@ export class GameApp {
     const generation = ++this.generation;
     this.loading = true;
     this.cancelAI(); this.pointer.cancel();
+    this.scene.clearFocus();
     this.session?.dispose(); this.session = null;
     this.opening?.dispose(); this.opening = null;
     this.aim = null; this.lastFrame = null; this.previousView = null;
@@ -241,7 +245,7 @@ export class GameApp {
       try {
         this.cancelAI(); this.pointer.cancel(); this.aim = null;
         const retained = this.session.frame.coins;
-        const level = generateBattleRefill(this.currentLevel!, retained, this.random);
+        const level = generateBattleRefill(this.currentLevel!, retained, this.random, battle.variant);
         if (!this.session.refill(level)) throw new Error('补币状态无效');
         const oldIds = new Set(retained.map(coin => coin.id));
         this.currentLevel = level; battle.level = level;

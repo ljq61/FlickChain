@@ -1,11 +1,11 @@
-import type { Direction, GameMode, GamePhase, GameView, LevelConfig, ShotFacts, WorldFrame } from '../types/contracts';
+import type { BattleWinScore, Direction, GameMode, GamePhase, GameView, LevelConfig, ShotFacts, WorldFrame } from '../types/contracts';
 import { PhysicsWorld, type PhysicsFeedback, type PhysicsSnapshot } from '../physics/PhysicsWorld';
 export type { PhysicsFeedback } from '../physics/PhysicsWorld';
 import { PHYSICS_CONFIG } from '../physics/MaterialRegistry';
 import { certainFouls, resolveShot } from '../gameplay/ShotResolver';
 
 let sessionSequence = 0;
-export const BATTLE_WIN_SCORE = 5;
+export const BATTLE_WIN_SCORE = 10;
 export interface SessionSnapshot {
   physics: PhysicsSnapshot;
   view: GameView;
@@ -23,19 +23,21 @@ export class GameSession {
   private quietSteps = 0;
   private pausedPhase: GamePhase | null = null;
   private readonly state: GameView;
-  private constructor(private readonly physics: PhysicsWorld, level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1) {
+  private constructor(private readonly physics: PhysicsWorld, level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1, battleWinScore: BattleWinScore) {
     this.state = {
       sessionId: `flickchain-${++sessionSequence}`, revision: 0, mode, phase: 'selecting', levelId: level.id,
       activeCoinId: null, canSelectCoin: true, currentPlayer: firstPlayer, scores: [0, 0], remaining: level.coins.length,
       chain: 0, shotCount: 0, foulReasons: [], lastResult: null, winner: null, error: null,
+      ...(mode === 'battle' ? { battleWinScore } : {}),
     };
   }
-  static async create(level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1 = 0): Promise<GameSession> {
+  static async create(level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1 = 0, battleWinScore: BattleWinScore = BATTLE_WIN_SCORE): Promise<GameSession> {
     if ((mode !== 'challenge' && mode !== 'battle') || (firstPlayer !== 0 && firstPlayer !== 1)) throw new Error('无效模式或先手');
+    if (battleWinScore !== BATTLE_WIN_SCORE) throw new Error('无效对战目标分数');
     if (level.purpose === 'opening') throw new Error('先手比较使用独立先手会话');
     const snapshot = structuredClone(level);
     const physics = await PhysicsWorld.create(snapshot);
-    return new GameSession(physics, snapshot, mode, firstPlayer);
+    return new GameSession(physics, snapshot, mode, firstPlayer, battleWinScore);
   }
   get view(): GameView { return structuredClone(this.state); }
   get frame(): WorldFrame { return this.physics.frame; }
@@ -48,6 +50,7 @@ export class GameSession {
   static async restore(input: SessionSnapshot): Promise<GameSession> {
     const snapshot = structuredClone(input);
     const view = snapshot.view;
+    const battleWinScore = view?.battleWinScore === undefined ? BATTLE_WIN_SCORE : view.battleWinScore;
     if (!view || (view.mode !== 'challenge' && view.mode !== 'battle') || (view.currentPlayer !== 0 && view.currentPlayer !== 1)
       || (view.phase !== 'ready' && view.phase !== 'selecting') || view.winner !== null
       || !Array.isArray(view.scores) || view.scores.length !== 2 || view.scores.some((score) => !Number.isInteger(score) || score < 0)
@@ -55,13 +58,15 @@ export class GameSession {
       || !Number.isInteger(view.shotCount) || view.shotCount < 0 || !Number.isInteger(view.chain) || view.chain < 0
       || !Number.isInteger(view.revision) || view.revision < 0 || typeof view.sessionId !== 'string' || !view.sessionId
       || snapshot.physics?.level?.purpose === 'opening' || view.levelId !== snapshot.physics?.level?.id
-      || (view.mode === 'battle' && view.scores.some((score) => score >= BATTLE_WIN_SCORE))) throw new Error('游戏快照状态无效');
+      || battleWinScore !== BATTLE_WIN_SCORE
+      || (view.mode === 'battle' && view.scores.some((score) => score >= battleWinScore))) throw new Error('游戏快照状态无效');
     const physics = await PhysicsWorld.restore(snapshot.physics);
     try {
       if (view.remaining !== physics.frame.coins.length || (view.phase === 'ready' && (!view.activeCoinId || !physics.hasCoin(view.activeCoinId)))
         || (view.phase === 'selecting' && (!view.canSelectCoin || view.activeCoinId !== null))) throw new Error('游戏快照控制映射无效');
-      const game = new GameSession(physics, snapshot.physics.level, view.mode, view.currentPlayer);
+      const game = new GameSession(physics, snapshot.physics.level, view.mode, view.currentPlayer, battleWinScore);
       Object.assign(game.state, view); game.lastFallenIds = [...snapshot.lastFallenIds];
+      if (view.mode === 'battle') game.state.battleWinScore = battleWinScore;
       return game;
     } catch (error) { physics.dispose(); throw error; }
   }
@@ -185,7 +190,7 @@ export class GameSession {
       this.state.activeCoinId = result.targetCoinId;
       this.state.remaining = this.physics.frame.coins.length;
       this.state.phase = this.state.mode === 'battle'
-        ? this.state.scores[this.state.currentPlayer] >= BATTLE_WIN_SCORE ? 'complete' : this.state.remaining <= 1 ? 'refilling' : 'ready'
+        ? this.state.scores[this.state.currentPlayer] >= this.state.battleWinScore! ? 'complete' : this.state.remaining <= 1 ? 'refilling' : 'ready'
         : this.state.remaining <= 1 ? 'complete' : 'ready';
     } else {
       this.state.chain = 0;

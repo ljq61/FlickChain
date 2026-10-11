@@ -50,6 +50,25 @@ describe('exact settled production snapshot replay', () => {
     game.pause(); expect(() => game.exportSnapshot()).toThrow('静止');
     game.resume(); finish(game); game.dispose(); expect(() => game.exportSnapshot()).toThrow('静止');
   });
+  it('restores a ten-point match above five and preserves the target throughout a real shot', async () => {
+    const game = await GameSession.create(level(), 'battle', 1, 10); sessions.push(game);
+    const snapshot = game.exportSnapshot(); snapshot.view.scores = [6, 8];
+    const clone = await GameSession.restore(snapshot); sessions.push(clone);
+    expect(clone.view).toMatchObject({ battleWinScore: 10, scores: [6, 8] });
+    clone.selectCoin('A'); clone.shoot({ x: 1, z: 0 }, .42); finish(clone);
+    expect(clone.view).toMatchObject({ phase: 'ready', winner: null, battleWinScore: 10, scores: [6, 9] });
+  });
+  it('defaults legacy snapshots to ten and rejects invalid or already-winning match snapshots', async () => {
+    const game = await create(); const legacy = game.exportSnapshot(); delete legacy.view.battleWinScore;
+    const clone = await GameSession.restore(legacy); sessions.push(clone);
+    expect(clone.view.battleWinScore).toBe(10);
+    for (const goal of [0, 5, 6, null, NaN]) {
+      const invalid = game.exportSnapshot(); Object.assign(invalid.view, { battleWinScore: goal });
+      await expect(GameSession.restore(invalid)).rejects.toThrow('状态无效');
+    }
+    const winning = game.exportSnapshot(); winning.view.scores[1] = 10;
+    await expect(GameSession.restore(winning)).rejects.toThrow('状态无效');
+  });
   it('restores an edge-overhanging retained coin after a valid Battle refill without revalidating it as a fresh spawn', async () => {
     const layout = level(); layout.coins = [{ id: 'A', x: .5, z: 0, materialId: 'standard' }, { id: 'B', x: -.5, z: .3, materialId: 'standard' }];
     const game = await GameSession.create(layout, 'battle'); sessions.push(game);

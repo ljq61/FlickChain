@@ -1,6 +1,6 @@
-# FlickChain《一弹到底》技术架构 V0.6
+# FlickChain《一弹到底》技术架构 V0.7
 
-版本：V0.6 · 日期：2026-10-11 · 状态：MVP与Pages构建发布流程已实现，PVP/PVE与Worker AI已接入，CrazyGames模块保留规划契约。
+版本：V0.7 · 日期：2026-10-11 · 状态：MVP与Pages构建发布流程已实现，PVP/PVE与Worker AI已接入，CrazyGames模块保留规划契约。
 
 本文件把产品规则转为模块边界和实现契约。产品范围以 `docs/PRD.md` 为准，阶段任务以 `docs/TASK_PLAN.md` 为准；若三份文档冲突，应先统一契约再实现。生产实现与验证范围见 [开发进度](PROGRESS.md) ；手模型/音效历史证据见 [前一版验收](validation/2026-10-11-hand-physics-audio.md)。下方目录、接口草案及AI/Worker、平台章节仍包含规划，不能把预留模块当成已实现能力。
 
@@ -11,7 +11,7 @@
 | Web 3D、所有硬币公共、Challenge 任意犯规失败 | 项目聊天「小游戏玩法设计」及用户修正，视为硬约束 |
 | TypeScript + Vite + Three.js + Rapier 3D WASM，HTML/CSS、Pointer Events、Web Audio | 源聊天技术方向及项目约定 |
 | 整杆判定、静止后移除 A、接管 B 终点、保留 Battle 残局 | 产品规则契约，所有模式共用 |
-| Battle先5分、比远争先、TIMEOUT零分安全结算后换人 | 2026-10-11用户规则，V0.6；比远与补币细则见PRD §5 |
+| Battle：PVP/PVE10分、比远争先、TIMEOUT零分安全结算后换人 | 2026-10-11用户规则，V0.7；比远与补币细则见PRD §5 |
 | 120 Hz、静止阈值、材质系数、AI 搜索预算、画质档位 | 调校候选，必须以实际模拟和手机验证决定 |
 | 连续随机轮、单档PVE、后续平台接入 | 分阶段交付范围，不能提前当成已验证能力 |
 
@@ -271,15 +271,15 @@ GameSession.advanceRound(level) 仅在 challenge complete 且唯一幸存币时�
 
 复活只在已结算 failed、无过渡且剩余机会大于 0 时允许。lastFallenCoinIds 来自最近结算杆，generateRevival 只补该掉落数量的金币；GameSession.revive 保留残局和分数，清掉失败并重新 selecting。仅成功后机会减 1，换轮不重置。无新币时不重落旧杯。重新开始完整销毁旧会话，从随机第一轮开始。
 
-### 6.2 本地Battle：PVP/PVE抢5分
+### 6.2 本地Battle：PVP/PVE10分
 
 GameApp生成BattleGenerator随机棋盘：木/大理石、1–5杯、9枚金币/铁币。Shell次级选择传入BattleVariant。OpeningSession使用purpose=opening单金币空桌，双方从(0,+0.64)向-Z依次弹射；生产物理停稳测量位移，掉落/超时弃权、1mm同距/双方弃权重试。App显示结果1.3秒再advance，胜者作为GameSession.create的firstPlayer；重新开始创建新随机桌并重比。
 
-GameSession保留完整一杆判定：成功+1并锁定目标B，犯规换人且自由选择公共币。5分优先终局；未到5分剩0–1币进入refilling，GameApp调用generateBattleRefill与session.refill，保留比分/玩家/幸存刚体真实位姿/同桌同杯，补至9币。成功仍锁定B，犯规仍由下家选币；入场期间锁操作，暂停冻结入场。
+GameSession保留完整一杆判定：成功+1并锁定目标B，犯规换人且自由选择公共币。目标分优先终局；未到目标分剩0–1币进入refilling，GameApp调用generateBattleRefill与session.refill，保留比分/玩家/幸存刚体真实位姿/同桌同杯；PVP补至9币，PVE新增8币。成功仍锁定B，犯规仍由下家选币；入场期间锁操作，暂停冻结入场。
 
 ### 7. Worker AI与生产快照
 
-src/ai/AIClient.ts惰性创建模块Worker入口BattleWorker.ts；BattleSearch.ts使用GameSession.restore逐候选恢复生产物理与完整规则。exportSnapshot仅允许Battle的quiet ready/selecting状态；SessionSnapshot保存view、lastFallenIds与PhysicsSnapshot。物理快照含Rapier字节、稳定ID/刚体/碰撞体映射、材质、支撑/自由/掉落/冻结/发射元数据与新补币信息。恢复重建EventQueue并验证绑定，不重新摆币。新补币仅按验证过的静止支撑初态允许导出，不为快照提前推进幸存币。
+src/ai/AIClient.ts惰性创建模块Worker入口BattleWorker.ts；BattleSearch.ts使用GameSession.restore逐候选恢复生产物理与完整规则。exportSnapshot仅允许Battle的quiet ready/selecting状态；SessionSnapshot保存view（含battleWinScore=10）、lastFallenIds与PhysicsSnapshot。物理快照含Rapier字节、稳定ID/刚体/碰撞体映射、材质、支撑/自由/掉落/冻结/发射元数据与新补币信息。恢复重建EventQueue并验证绑定，不重新摆币。新补币仅按验证过的静止支撑初态允许导出，不为快照提前推进幸存币。
 
 自由选币时评估公共源币/目标对，接力时源限定activeCoinId。预算48候选/1.8秒，每候选从相同初态恢复、完整模拟到成功或犯规安全结算。排序考虑成功、终点留位与胜利；无得分解仍返回合法失误输入，实际得分由主世界独立判定。Opening搜索同样复用PhysicsWorld。
 
@@ -334,7 +334,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 | 纯规则测试 | MISS、唯一 B、重复 A-B、A-B 后 B-C/D 合法、A 直接 B/C、同一步多币、墙合法、任意掉落、TIMEOUT、重复提交 | ShotResolver 与模式契约，不证明真实碰撞采集 |
 | 生产物理回归 | 薄币／薄墙最大冲量、反弹、桌上锁 X/Z 且可 Y 旋转、离桌解锁翻落、支撑切换防抖／无姿态突跳、空中低速、边缘掉落、全场静止、删除／handle 复用、冻结 | 固定配置的真实 Rapier 与显式转动约束行为 |
 | 单杆生命周期 | 发射拒绝、早期失败后清理、成功移除 A 与接管 B、暂停恢复、重开、过期 callback | 业务与物理连接，无输入空窗 |
-| 模式回归 | Challenge 掉落减币失败、合法最终目标、Battle比远先手/同距重比、连续得分、残局、A掉落重选、≤1币补足9、5分终局 | 模式完整转移 |
+| 模式回归 | Challenge 掉落减币失败、合法最终目标、Battle比远先手/同距重比、连续得分、残局、A掉落重选、PVP补足9/PVE新增8、10分终局 | 模式完整转移 |
 | AI／快照 | clone 初态一致、映射／转动约束恢复、live buffer 未 detach、取消／terminate、过期响应、AI_THINKING 合法发射且人类被拒、A 掉落后 AI 自行选币、预算、资源释放 | 搜索正确使用生产模型，AI 回合不会因权限／选币卡住 |
 | 关卡解回放 | 随机配方/初稳/继承/复活，旧五布局完整解回放 | 该版本关卡可解证据 |
 | 浏览器鼠标 | 选择、拖动、释放／取消、暂停／重试、失败锁定、光圈／HUD／命中区恢复、竖横布局 | 实际渲染及鼠标交互 |
@@ -349,7 +349,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 
 1. **Physics／Input**：可启动真实 3D 物理，标准币／木桌、固定时钟、拖动、支撑／掉落与60/120对照；不提前做完整 AI 或平台。
 2. **Rules**：完整单杆采集、整杆合法性、一次提交、接力／清理、TIMEOUT与规则回归。
-3. **Modes（MVP）**：连续随机 CLEAR_ALL Challenge、本地 Battle 全流程、教程／基础音效／本地进度、5分终局／比远／补币／选币、实际浏览器交互；按V0.6规则验收。
+3. **Modes（MVP）**：连续随机 CLEAR_ALL Challenge、本地 Battle 全流程、教程／基础音效／本地进度、10分终局／比远／补币／选币、实际浏览器交互；按V0.7规则验收。
 4. **AI**：Worker clone、共享判定、预算／取消、难度与手机性能验证。
 5. **Content**：材质调校、随机轮全链体验与回归、视觉／音频／真机打磨。
 6. **Publish**：刷新平台文档与限制、SDK、静态包、上线与平台验收。
@@ -360,7 +360,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 
 | 项目 | 决策节点与证据 |
 | --- | --- |
-| 抢5分、随机九币/杯与比远先手 | 当前与PRD V0.6一致；同距与双方掉落重比，公平性需试玩 |
+| 抢10分、随机九币/杯与比远先手 | 当前与PRD V0.7一致；同距与双方掉落重比，公平性需试玩 |
 | TIMEOUT 步数、冻结非法支撑处理 | 阶段 1／2 用真实难静止场景确定；须与规则版本绑定 |
 | 60/120 Hz、静止阈值、CCD／求解迭代、桌上转动锁定切换 | 阶段 1 固定场景与真机对照，选定后不随 FPS 改变；验证离桌解锁和重落桌面策略 |
 | 材料摩擦／恢复／阻尼及币尺度 | 先标准币木桌，实测滑行距离、回弹和停稳；变化重验关卡 |
@@ -396,3 +396,5 @@ SaveAdapter 沿用 flickchain.progress.v1 / schema 1，保存声音和非负安�
 - PointerInput 满档后2秒取消hold，触发一次charge-failed；释放不发射，需要再次按下。HUD/指针/手部恢复待机，取消不计杆。GameApp 本场复活初始化3，成功复活后递减，换轮不补充；首次材料提示由App拥有。
 - JazzScore 仅供离线脚本生成58.18秒/66 BPM原创伴奏；无萨克斯主奏，和弦触键有微小时间/力度变化，低频室内尾音已烘焙。运行端只解码MP3、复用一个loop source；gain由0.28降至0.16、1.4秒淡入，暂停/静音/销毁仍统一清理。
 - deploy-pages.yml 在main推送后先npm ci/test/build，再仅上传dist并部署GitHub Pages。相对base支持/FlickChain/子路径；Pages应使用workflow来源。公开站点冷启动、模型/音频资源与控制台需在部署后核验，CrazyGames不在此流程内。
+
+蓄力条为SceneManager持有的HTML/CSS浮层，读取同一AimPreview.power，随手的屏幕投影放在左侧；fixed绿黄红gradient以力度裁切，自底向上增长。它不写物理、不捕获指针，非人类ready/未蓄力即隐藏，dispose移除。

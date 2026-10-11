@@ -25,6 +25,7 @@ export class OpeningSession {
       chain: 0, shotCount: 0, foulReasons: [], lastResult: null, winner: null, error: null,
       battle: { variant, stage: 'opening', distances: [null, null], fallen: [false, false], openingAttempt: 1 },
       inputOwner: 'human',
+      battleWinScore: 10,
     };
   }
   static async create(input: LevelConfig, variant: BattleVariant): Promise<OpeningSession> {

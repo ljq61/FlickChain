@@ -3,6 +3,7 @@ export type Quaternion = { x: number; y: number; z: number; w: number };
 export type Direction = { x: number; z: number };
 export type GameMode = 'challenge' | 'battle';
 export type BattleVariant = 'pvp' | 'pve';
+export type BattleWinScore = 10;
 export type GamePhase = 'ready' | 'selecting' | 'simulating' | 'refilling' | 'failed' | 'complete' | 'paused' | 'error';
 export type CoinMaterialId = 'standard' | 'iron';
 export type TableMaterialId = 'wood' | 'marble';
@@ -84,6 +85,8 @@ export interface GameView {
   /** App adds local opponent/phase information; Core still owns score and turn. */
   battle?: BattleView;
   inputOwner?: 'human' | 'computer';
+  /** Persisted with Core snapshots so Battle searches use the same ten-point goal. */
+  battleWinScore?: BattleWinScore;
 }
 export interface BattleView {
   variant: BattleVariant;

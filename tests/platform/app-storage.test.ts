@@ -4,7 +4,7 @@ import { GameApp } from '../../src/app/GameApp';
 import { LEVELS } from '../../src/content/levels';
 import type { AiShot } from '../../src/ai/AIClient';
 import type { SessionSnapshot } from '../../src/core/GameSession';
-import type { BattleVariant, CoinTransform, GameMode, GameView, LevelConfig, WorldFrame } from '../../src/types/contracts';
+import type { BattleVariant, BattleWinScore, CoinTransform, GameMode, GameView, LevelConfig, WorldFrame } from '../../src/types/contracts';
 
 const harness = vi.hoisted(() => ({
   sessions: [] as Array<{
@@ -12,7 +12,7 @@ const harness = vi.hoisted(() => ({
     dispose: ReturnType<typeof vi.fn>; advanceRound: ReturnType<typeof vi.fn>; revive: ReturnType<typeof vi.fn>;
     shoot: ReturnType<typeof vi.fn>; selectCoin: ReturnType<typeof vi.fn>; refill: ReturnType<typeof vi.fn>; exportSnapshot: ReturnType<typeof vi.fn>;
   }>,
-  creations: [] as Array<{ level: LevelConfig; mode: GameMode; firstPlayer: 0 | 1 }>,
+  creations: [] as Array<{ level: LevelConfig; mode: GameMode; firstPlayer: 0 | 1; battleWinScore: BattleWinScore }>,
   openings: [] as Array<{ view: GameView; frame: WorldFrame; level: LevelConfig; shoot: ReturnType<typeof vi.fn>; advance: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }>,
   aiRequests: [] as Array<{ kind: 'opening' | 'battle'; payload: LevelConfig | SessionSnapshot; resolve: (decision: AiShot | number) => void; reject: (error: Error) => void }>,
   cancelAI: vi.fn(), disposeAI: vi.fn(), resetView: vi.fn(),
@@ -24,8 +24,8 @@ const harness = vi.hoisted(() => ({
 
 // App, Shell, generator and storage remain real. Physics and renderer are tested separately.
 vi.mock('../../src/core/GameSession', () => ({ GameSession: {
-  create: vi.fn(async (level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1 = 0) => {
-    harness.creations.push({ level: structuredClone(level), mode, firstPlayer });
+  create: vi.fn(async (level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1 = 0, battleWinScore: BattleWinScore = 10) => {
+    harness.creations.push({ level: structuredClone(level), mode, firstPlayer, battleWinScore });
     let config = level;
     const frameFor = (next: LevelConfig, retained: CoinTransform[] = []): WorldFrame => ({
       table: next.table, obstacles: next.obstacles,
@@ -37,7 +37,8 @@ vi.mock('../../src/core/GameSession', () => ({ GameSession: {
     const session = {
       view: { sessionId: `app-test-${harness.sessions.length}`, revision: 0, mode, phase: 'selecting', levelId: level.id,
         activeCoinId: null, canSelectCoin: true, currentPlayer: firstPlayer, scores: [0, 0], remaining: level.coins.length,
-        chain: 0, shotCount: 0, foulReasons: [], lastResult: null, winner: null, error: null } as GameView,
+        chain: 0, shotCount: 0, foulReasons: [], lastResult: null, winner: null, error: null,
+        ...(mode === 'battle' ? { battleWinScore } : {}) } as GameView,
       frame: frameFor(level), lastFallenCoinIds: [] as string[],
       tick: vi.fn(), drainFeedback: () => [], dispose: vi.fn(),
       selectCoin: vi.fn((id: string) => { session.view = { ...session.view, phase: 'ready', activeCoinId: id, revision: session.view.revision + 1 }; return true; }),
@@ -399,6 +400,7 @@ describe('continuous Challenge app and persistence', () => {
       await vi.waitFor(() => expect(harness.creations.at(-1)!.mode).toBe('battle'));
       const created = harness.creations.at(-1)!;
       expect(created.firstPlayer).toBe(1);
+      expect(created.battleWinScore).toBe(10);
       expect(created.level.coins).toHaveLength(9);
       expect(created.level.obstacles.length).toBeGreaterThanOrEqual(1);
       expect(created.level.obstacles.length).toBeLessThanOrEqual(5);
@@ -408,7 +410,7 @@ describe('continuous Challenge app and persistence', () => {
       expect(harness.sessions.at(-1)!.view).toMatchObject({ currentPlayer: 1, scores: [0, 0], remaining: 9 });
       expect(harness.inputState!().view).toBeNull(); // arrival, then computer when PVE
       frames(90);
-      expect(node('[data-el="mode"]').textContent).toBe(variant === 'pve' ? '人机抢 5 分' : '双人抢 5 分');
+      expect(node('[data-el="mode"]').textContent).toBe(variant === 'pve' ? '人机抢 10 分' : '双人抢 10 分');
       expect(harness.inputState!().view?.currentPlayer ?? null).toBe(variant === 'pve' ? null : 1);
       expect(harness.resetView).toHaveBeenCalledTimes(3);
       expect(storage.setItem).not.toHaveBeenCalled();
@@ -449,6 +451,40 @@ describe('continuous Challenge app and persistence', () => {
       expect(node('[data-el="score-one"]').textContent).toBe('3');
       expect(node('[data-el="score-two"]').textContent).toBe('2');
       expect(harness.creations.filter(({ mode }) => mode === 'battle')).toHaveLength(1);
+    });
+
+    it.each([0, 1])('adds eight new PVE coins with %s survivors and carries the ten-point goal through repeated refills', async retainedCount => {
+      await initialize();
+      const session = await reachBattle('pve', 1); frames(35);
+      const initial = harness.aiRequests.slice().reverse().find(item => item.kind === 'battle')!;
+      initial.resolve(battleDecision(session)); await Promise.resolve(); frames(55);
+      const carry = structuredClone(session.frame.coins.at(-1)!);
+      session.frame.coins = retainedCount ? [carry] : [];
+      session.view = { ...session.view, phase: 'refilling', scores: [6, 9], currentPlayer: 1,
+        remaining: retainedCount, activeCoinId: retainedCount ? carry.id : null, canSelectCoin: !retainedCount,
+        revision: session.view.revision + 1 };
+      frames();
+      expect(harness.arrivals.at(-1)).toHaveLength(8);
+      expect(session.frame.coins).toHaveLength(8 + retainedCount);
+      if (retainedCount) expect(session.frame.coins.find(coin => coin.id === carry.id)).toEqual(carry);
+      frames(130);
+      const fresh = harness.aiRequests.slice().reverse().find(item => item.kind === 'battle')!;
+      expect((fresh.payload as SessionSnapshot).view).toMatchObject({ battleWinScore: 10, scores: [6, 9], remaining: 8 + retainedCount });
+      fresh.resolve({ ...battleDecision(session), coinId: retainedCount ? carry.id : session.frame.coins[0].id });
+      await Promise.resolve(); frames(55);
+      session.frame.coins = [structuredClone(session.frame.coins.at(-1)!)];
+      session.view = { ...session.view, phase: 'refilling', remaining: 1, activeCoinId: session.frame.coins[0].id,
+        canSelectCoin: false, revision: session.view.revision + 1 };
+      frames();
+      expect(harness.arrivals.at(-1)).toHaveLength(8);
+      expect(session.refill).toHaveBeenCalledTimes(2);
+      expect(session.view).toMatchObject({ scores: [6, 9], battleWinScore: 10, remaining: 9 });
+      frames(130);
+      session.view = { ...session.view, phase: 'complete', scores: [6, 10], winner: 1 };
+      frames();
+      expect(node('[data-el="modal-title"]').textContent).toBe('电脑获胜');
+      expect(node('[data-el="modal-description"]').textContent).toContain('10 分');
+      expect(session.refill).toHaveBeenCalledTimes(2);
     });
 
     it('restarts computer search from the refilled board while preserving the locked relay and scores', async () => {
@@ -588,15 +624,15 @@ describe('continuous Challenge app and persistence', () => {
       expect(opening.shoot).toHaveBeenCalledTimes(action === 'pause' ? 1 : 0);
     });
 
-    it('shows first-to-five victory without refilling or advancing the old board', async () => {
+    it('shows first-to-ten victory without refilling or advancing the old board', async () => {
       await initialize();
       const session = await reachBattle();
-      session.view = { ...session.view, phase: 'complete', winner: 0, scores: [5, 3], remaining: 1 };
+      session.view = { ...session.view, phase: 'complete', winner: 0, scores: [10, 3], remaining: 1 };
       frames(150);
       expect(session.refill).not.toHaveBeenCalled(); expect(session.advanceRound).not.toHaveBeenCalled();
       expect(node('[data-el="modal-layer"]').hidden).toBe(false);
       expect(node('[data-el="modal-title"]').textContent).toBe('玩家一获胜');
-      expect(node('[data-el="modal-score"]').textContent).toBe('玩家一 5  :  3 玩家二');
+      expect(node('[data-el="modal-score"]').textContent).toBe('玩家一 10  :  3 玩家二');
       expect(storage.setItem).not.toHaveBeenCalled();
     });
   });

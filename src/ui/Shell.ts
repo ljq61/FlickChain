@@ -60,7 +60,7 @@ export class Shell {
       <main class="home-menu" data-el="home">
         <div class="menu-intro"><h1 class="title-logo" aria-label="一弹到底">${TITLE_LOGO}</h1></div>
         <div class="menu-actions" data-el="main-actions"><button type="button" class="primary-button menu-button" data-action="challenge"><span class="button-icon">${COIN_ICON}</span><span class="button-label">单人游戏</span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button" data-action="battle"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">本地对战</span>${CHEVRON_ICON}</button><p class="menu-progress" data-el="progress">本地最高 0 分</p></div>
-        <div class="menu-actions battle-menu" data-el="battle-actions" hidden><div class="battle-menu-heading"><button type="button" class="quiet-button menu-back" data-action="battle-back" aria-label="返回主界面" title="返回主界面">${BACK_ICON}</button><h2>本地对战</h2></div><button type="button" class="primary-button menu-button battle-choice" data-action="pvp" aria-label="PVP 玩家对战"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">PVP<small>玩家对战</small></span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button battle-choice" data-action="pve" aria-label="PVE 人机对战"><span class="button-icon">${COMPUTER_ICON}</span><span class="button-label">PVE<small>人机对战</small></span>${CHEVRON_ICON}</button><p class="menu-progress">比远争先 · 先得 5 分获胜</p></div>
+        <div class="menu-actions battle-menu" data-el="battle-actions" hidden><div class="battle-menu-heading"><button type="button" class="quiet-button menu-back" data-action="battle-back" aria-label="返回主界面" title="返回主界面">${BACK_ICON}</button><h2>本地对战</h2></div><button type="button" class="primary-button menu-button battle-choice" data-action="pvp" aria-label="PVP 玩家对战"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">PVP<small>玩家对战</small></span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button battle-choice" data-action="pve" aria-label="PVE 人机对战"><span class="button-icon">${COMPUTER_ICON}</span><span class="button-label">PVE<small>人机对战</small></span>${CHEVRON_ICON}</button><p class="menu-progress">比远争先 · 先得 10 分获胜</p></div>
         <p class="table-caption">同一张桌，所有硬币都公共</p>
       </main>
       <section class="game-hud" data-el="hud" hidden aria-label="对局信息"><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><strong data-el="score-one">0</strong><span data-el="score-one-label">分</span></div><div class="score-cell" data-el="player-two" hidden><span data-el="score-two-label">玩家二</span><strong data-el="score-two">0</strong></div><div class="remaining-cell" data-el="remaining-cell"><strong data-el="remaining">3</strong><span data-el="remaining-label">次机会</span></div></div><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective" hidden>留住最后一枚，继续下一轮</p></div></div></section>
@@ -132,11 +132,12 @@ export class Shell {
       const battle = view.mode === 'battle';
       const opening = battle && view.battle?.stage === 'opening';
       const computer = view.inputOwner === 'computer';
+      const winScore = view.battleWinScore ?? 10;
       const playerNames = view.battle?.variant === 'pve' ? ['你', '电脑'] : ['玩家一', '玩家二'];
       const currentName = playerNames[view.currentPlayer];
       this.element.dataset.battleStage = view.battle?.stage ?? '';
       const round = campaign?.round ?? 1;
-      this.text('mode', battle ? `${view.battle?.variant === 'pve' ? '人机' : '双人'}抢 5 分` : '');
+      this.text('mode', battle ? `${view.battle?.variant === 'pve' ? '人机' : '双人'}抢 ${winScore} 分` : '');
       this.node('mode').hidden = !battle;
       this.text('level-name', battle ? opening ? '比远争先' : '' : `第 ${round} 轮`);
       this.node('level-name').hidden = battle && !opening;
@@ -174,7 +175,7 @@ export class Shell {
           : '按住手指蓄力，松手直弹；停稳更远者先手，掉落放弃先手';
         turn = `第 ${view.battle!.openingAttempt} 次比远 · ${currentName}`;
       } else if (view.phase === 'refilling') {
-        title = '重新摆满九枚硬币'; description = '双方分数保留，硬币落稳后继续'; turn = '正在摆桌';
+        title = view.battle?.variant === 'pve' ? '随机新增八枚硬币' : '重新摆满九枚硬币'; description = '残局和双方分数保留，硬币落稳后继续'; turn = '正在摆桌';
       } else if (transition === 'clearing' || (challenge && view.phase === 'complete')) {
         title = '留住这一枚，下一轮接着来'; description = '整理桌面，准备新的硬币'; turn = '本轮接力完成';
       } else if (transition === 'arriving' || introducing) {
@@ -297,8 +298,9 @@ export class Shell {
         this.button('modal-tertiary', '返回菜单', 'home', !revive);
       } else if (view?.mode === 'battle') {
         const names = view.battle?.variant === 'pve' ? ['你', '电脑'] : ['玩家一', '玩家二'];
+        const winScore = view.battleWinScore ?? 10;
         title = view.winner === 'draw' ? '势均力敌，平局' : `${names[view.winner === 0 ? 0 : 1]}获胜`;
-        description = '先得 5 分者胜利，每一次合法接力都算数。';
+        description = `先得 ${winScore} 分者胜利，每一次合法接力都算数。`;
         score = `${names[0]} ${view.scores[0]}  :  ${view.scores[1]} ${names[1]}`;
         this.button('modal-primary', '再来一局', 'retry');
         this.button('modal-secondary', '返回菜单', 'home');

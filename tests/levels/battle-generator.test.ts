@@ -42,6 +42,27 @@ describe('random battle board', () => {
     expect(refill.coins.slice(1).every((coin) => !level.coins.some((old) => old.id === coin.id))).toBe(true);
     expect(generateBattleRefill(level, [], () => 0).coins).toHaveLength(9);
   });
+  it.each([0, 1])('adds exactly eight fresh mixed coins for PVE with %s survivors', (retainedCount) => {
+    const level = generateBattle(seeded(456));
+    const survivor: CoinTransform = { id: level.coins[0].id, materialId: 'iron', position: { x: 0.799, y: 0.004, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } };
+    const retained = retainedCount ? [survivor] : [];
+    const before = structuredClone({ level, retained });
+    const kinds = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const refill = generateBattleRefill(level, retained, seeded(seed * 9187), 'pve');
+      expect(refill.coins).toHaveLength(retainedCount + 8);
+      expect(refill.table).toEqual(level.table); expect(refill.obstacles).toEqual(level.obstacles);
+      if (retainedCount) expect(refill.coins[0]).toEqual({ id: survivor.id, materialId: 'iron', x: survivor.position.x, z: survivor.position.z });
+      const added = refill.coins.slice(retainedCount);
+      expect(added).toHaveLength(8);
+      expect(added.every((coin) => !level.coins.some((old) => old.id === coin.id))).toBe(true);
+      added.forEach((coin) => kinds.add(coin.materialId));
+      expect(validateLevel(refill, new Set(retained.map((coin) => coin.id)), new Set(level.obstacles.map((cup) => cup.id)))).toEqual(refill);
+    }
+    expect(kinds).toEqual(new Set(['standard', 'iron']));
+    expect({ level, retained }).toEqual(before);
+    for (const value of [0, .5, 1]) expect(generateBattleRefill(level, retained, () => value, 'pve').coins).toHaveLength(retainedCount + 8);
+  });
   it('uses the exact same bottom-side gold start for both opening attempts', async () => {
     for (const materialId of ['wood', 'marble'] as const) {
       const table = { shape: 'circle' as const, width: 1.6, depth: 1.6, materialId };
