@@ -120,20 +120,20 @@ describe('campaign scene resource continuity', () => {
   it('removes every human-control visual on computer ownership and restores it on the human turn', () => {
     const config = level(); scene.setLevel(config);
     const authoritative = frame(config);
-    const resources = scene as unknown as Resources & { activeHalo: THREE.Mesh; finger: THREE.Group; glowLight: THREE.PointLight; ironMaterial: THREE.Material; brassMaterial: THREE.Material };
+    const resources = scene as unknown as Resources & { finger: THREE.Group; glowLight: THREE.PointLight; ironMaterial: THREE.Material; brassMaterial: THREE.Material };
     scene.render(authoritative, ready, null);
-    expect(resources.finger.visible).toBe(true); expect(resources.activeHalo.visible).toBe(true);
+    expect(resources.finger.visible).toBe(true);
     for (const phase of ['ready', 'selecting'] as const) {
       scene.render(authoritative, { ...ready, mode: 'battle', phase, inputOwner: 'computer' }, null);
-      expect(resources.finger.visible).toBe(false); expect(resources.activeHalo.visible).toBe(false);
+      expect(resources.finger.visible).toBe(false);
       expect(resources.glowLight.intensity).toBe(0);
       expect(resources.coinMeshes.get('survivor')!.userData.body.material).toBe(resources.ironMaterial);
       expect(resources.coinMeshes.get('new')!.userData.body.material).toBe(resources.brassMaterial);
     }
     scene.render(authoritative, { ...ready, inputOwner: 'human' }, null);
-    expect(resources.finger.visible).toBe(true); expect(resources.activeHalo.visible).toBe(true);
+    expect(resources.finger.visible).toBe(true);
     scene.render(authoritative, { ...ready, phase: 'refilling' }, null);
-    expect(resources.finger.visible).toBe(false); expect(resources.activeHalo.visible).toBe(false);
+    expect(resources.finger.visible).toBe(false);
   });
 
   it.each([[320, 568], [390, 844], [1280, 720]])('anchors an upward charge fill left of the hand, follows the camera and clamps inside %s×%s', (width, height) => {
@@ -473,16 +473,15 @@ describe('campaign scene resource continuity', () => {
     expect(active.x).toBeGreaterThan(365); expect(active.y).toBeGreaterThan(80); expect(active.y).toBeLessThan(230);
   });
 
-  it('follows the authoritative active coin with a halo, suppresses it on motion/overlays and locks the aiming camera', () => {
+  it('follows the authoritative active coin with the hand, suppresses it on motion/overlays and locks the aiming camera', () => {
     const config = level(); scene.setLevel(config);
     const authoritative = frame(config);
     const before = structuredClone(authoritative);
-    const resources = scene as unknown as { activeHalo: THREE.Mesh; camera: THREE.PerspectiveCamera };
+    const resources = scene as unknown as { finger: THREE.Group; glowLight: THREE.PointLight; camera: THREE.PerspectiveCamera };
     for (let step = 0; step < 60; step++) scene.render(authoritative, ready, null);
-    expect(resources.activeHalo.visible).toBe(true);
-    expect(resources.activeHalo.position.x).toBe(0.3);
-    expect(resources.activeHalo.position.z).toBe(0.25);
-    expect(resources.activeHalo.scale.x).toBe(1.12);
+    expect(resources.finger.visible).toBe(true);
+    expect(resources.glowLight.position.x).toBe(0.3);
+    expect(resources.glowLight.position.z).toBe(0.25);
     const cameraPosition = resources.camera.position.clone();
     const projection = resources.camera.projectionMatrix.clone();
     const aiming: AimPreview = { source: authoritative.coins[0].position, direction: scene.getAimDirection(), power: 0.6 };
@@ -492,10 +491,10 @@ describe('campaign scene resource continuity', () => {
     expect(resources.camera.projectionMatrix.equals(projection)).toBe(true);
     for (const phase of ['simulating', 'failed', 'paused', 'complete', 'error'] as const) {
       scene.render(authoritative, { ...ready, phase }, null);
-      expect(resources.activeHalo.visible).toBe(false);
+      expect(resources.finger.visible).toBe(false);
     }
-    scene.render(authoritative, null, null); expect(resources.activeHalo.visible).toBe(false);
-    scene.render(authoritative, ready, null); expect(resources.activeHalo.visible).toBe(true);
+    scene.render(authoritative, null, null); expect(resources.finger.visible).toBe(false);
+    scene.render(authoritative, ready, null); expect(resources.finger.visible).toBe(true);
     expect(authoritative).toEqual(before);
   });
 });

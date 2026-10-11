@@ -174,7 +174,6 @@ export class SceneManager {
   private readonly rimGeometry = new THREE.TorusGeometry(COIN_RADIUS * 0.9, COIN_RADIUS * 0.027, 6, 64);
   private readonly stampGeometry = new THREE.TorusGeometry(COIN_RADIUS * 0.57, COIN_RADIUS * 0.014, 5, 48);
   private readonly shadowGeometry = new THREE.PlaneGeometry(COIN_RADIUS * 3.7, COIN_RADIUS * 3.7);
-  private readonly activeHalo = new THREE.Mesh(new THREE.TorusGeometry(COIN_RADIUS * 1.28, 0.0009, 6, 64), new THREE.MeshBasicMaterial({ color: 0xffe1a0, transparent: true, opacity: 0.9, depthWrite: false }));
   private readonly glowLight = new THREE.PointLight(GLOW_COLOR, 0, 0.45, 2);
   private readonly finger = new FlickFinger();
   private readonly chargeMeter = document.createElement('div');
@@ -240,10 +239,7 @@ export class SceneManager {
     const fill = new THREE.DirectionalLight(0xadd1d6, 0.55);
     fill.position.set(1.5, 2.5, 1.6);
     this.scene.add(fill);
-    this.activeHalo.rotation.x = -Math.PI / 2;
-    this.activeHalo.visible = false;
-    this.activeHalo.raycast = () => {};
-    this.scene.add(this.tavern, this.tableGroup, this.glowLight, this.activeHalo);
+    this.scene.add(this.tavern, this.tableGroup, this.glowLight);
     this.scene.add(this.finger);
     this.setLevel({ schemaVersion: 1, id: 'preview', name: '', lesson: '', table: { ...this.table, materialId: 'wood' }, coins: [], activeCoinId: '', obstacles: [] });
     this.observer = new ResizeObserver(() => this.resize());
@@ -519,12 +515,8 @@ export class SceneManager {
         activeOnTable = onTable;
         activeX = transform.position.x;
         activeZ = transform.position.z;
-        this.activeHalo.scale.setScalar(coinRadius(transform.materialId) / COIN_RADIUS);
       }
     }
-    this.activeHalo.visible = activeOnTable;
-    this.activeHalo.position.set(activeX, 0.0012, activeZ);
-    (this.activeHalo.material as THREE.MeshBasicMaterial).opacity = 0.65 + pulse * 0.25;
     if (glowAt) {
       this.glowLight.position.set(glowAt.x, glowAt.y + 0.05, glowAt.z);
       this.glowLight.intensity = 0.004 + 0.014 * pulse;
