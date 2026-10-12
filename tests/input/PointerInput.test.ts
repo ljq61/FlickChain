@@ -71,6 +71,15 @@ describe('public launch choices and relay pointer ownership', () => {
     pointer('pointerdown', 650); pointer('pointermove', 680); pointer('pointerup', 680);
     expect(orbit).toHaveBeenCalledWith(30, 0);
   });
+  it('suppresses a native long-press menu without interrupting the charge', () => {
+    pointer('pointerdown', 200); now += 600;
+    const menu = new Event('contextmenu', { bubbles: true, cancelable: true });
+    canvas.dispatchEvent(menu);
+    expect(menu.defaultPrevented).toBe(true);
+    expect(input.charge()?.elapsedMs).toBe(600);
+    now += 25; pointer('pointerup', 200);
+    expect(shoot).toHaveBeenCalledExactlyOnceWith({ x: 1, z: 0 }, .5);
+  });
   it('expires at 3250 ms exactly once, restores the hand and requires a new hold', () => {
     pointer('pointerdown', 200);
     now += 3249;
