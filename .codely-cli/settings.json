@@ -5,6 +5,5 @@
       "httpUrl": "https://ai-generator.tuanjie.cn/mcp"
     }
   },
-  "defaultAgentModel": "codely-core",
-  "model": "codely-core"
+  "defaultAgentModel": "codely-core"
 }
