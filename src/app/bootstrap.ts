@@ -8,6 +8,6 @@ try {
   void app.initialize();
   if (import.meta.hot) import.meta.hot.dispose(() => app.dispose());
 } catch {
-  root.innerHTML = '<main class="boot-error"><h1>桌面暂时无法打开</h1><p>请确认浏览器支持 WebGL，然后刷新页面重试。</p><button type="button">重新加载</button></main>';
+  root.innerHTML = '<main class="boot-error"><h1>FlickChain could not start</h1><p>Check that your browser supports WebGL, then reload to try again.</p><button type="button">Reload</button></main>';
   root.querySelector('button')?.addEventListener('click', () => location.reload());
 }

@@ -267,12 +267,12 @@ describe('continuous Challenge app and persistence', () => {
     for (const coin of survivors) expect(session.frame.coins.find(item => item.id === coin.id)).toEqual(coin);
     expect(harness.arrivals.at(-1)).toHaveLength(fallenCount);
     expect(session.view).toMatchObject({ scores: [2, 0], canSelectCoin: true, activeCoinId: null, phase: 'selecting' });
-    expect(node('.remaining-cell').textContent).toBe('2次机会');
+    expect(node('.remaining-cell').textContent).toBe('2Continues');
     for (const allowance of [1, 0]) {
       fail();
       expect(node<HTMLButtonElement>('[data-el="modal-primary"]').dataset.action).toBe('revive');
       node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames(90);
-      expect(node('.remaining-cell').textContent).toBe(`${allowance}次机会`);
+      expect(node('.remaining-cell').textContent).toBe(`${allowance}${allowance === 1 ? 'Continue' : 'Continues'}`);
     }
     expect(session.revive).toHaveBeenCalledTimes(3);
     fail();
@@ -283,19 +283,19 @@ describe('continuous Challenge app and persistence', () => {
 
   it('introduces iron and marble exactly in their first campaign round and clears their next-round tips', async () => {
     await initialize(); await start(); frames(90);
-    expect(node('.remaining-cell').textContent).toBe('3次机会');
+    expect(node('.remaining-cell').textContent).toBe('3Continues');
     const next = () => { complete(); frames(180); };
     next();
-    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('青色铁币');
+    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('Iron coins');
     next();
-    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('青色铁币');
+    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('Iron coins');
     next();
-    expect(node('[data-el="tutorial-tip"]').textContent).toContain('青色铁币重量和摩擦力更大');
+    expect(node('[data-el="tutorial-tip"]').textContent).toContain('Iron coins are heavier and have more friction.');
     next();
-    expect(node('[data-el="tutorial-tip"]').textContent).toContain('大理石桌面比木头桌面更容易滑行，摩擦力更低');
-    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('青色铁币');
+    expect(node('[data-el="tutorial-tip"]').textContent).toContain('Marble is more slippery than wood.');
+    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('Iron coins');
     next();
-    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('大理石桌面');
+    expect(node('[data-el="tutorial-tip"]').textContent).not.toContain('Marble');
   });
 
   it.each(['boot', 'entry'] as const)('retries a failed hand load at %s without leaving a stale loading gate', async (stage) => {
@@ -325,7 +325,7 @@ describe('continuous Challenge app and persistence', () => {
     storage.setItem.mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError'); });
     await initialize(); await start(); frames(90); complete();
     expect(node('[data-el="notice"]').hidden).toBe(false);
-    expect(node('[data-el="notice-message"]').textContent).toContain('未保存');
+    expect(node('[data-el="notice-message"]').textContent).toContain('not saved');
     node<HTMLButtonElement>('[data-action="dismiss-notice"]').click(); frames(130);
     expect(harness.sessions.at(-1)!.advanceRound).toHaveBeenCalledTimes(1);
     expect(node('[data-el="notice"]').hidden).toBe(true);
@@ -410,7 +410,7 @@ describe('continuous Challenge app and persistence', () => {
       expect(harness.sessions.at(-1)!.view).toMatchObject({ currentPlayer: 1, scores: [0, 0], remaining: 9 });
       expect(harness.inputState!().view).toBeNull(); // arrival, then computer when PVE
       frames(90);
-      expect(node('[data-el="mode"]').textContent).toBe(variant === 'pve' ? '人机抢 10 分' : '双人抢 10 分');
+      expect(node('[data-el="mode"]').textContent).toBe('First to 10');
       expect(harness.inputState!().view?.currentPlayer ?? null).toBe(variant === 'pve' ? null : 1);
       expect(harness.resetView).toHaveBeenCalledTimes(3);
       expect(storage.setItem).not.toHaveBeenCalled();
@@ -482,8 +482,8 @@ describe('continuous Challenge app and persistence', () => {
       frames(130);
       session.view = { ...session.view, phase: 'complete', scores: [6, 10], winner: 1 };
       frames();
-      expect(node('[data-el="modal-title"]').textContent).toBe('电脑获胜');
-      expect(node('[data-el="modal-description"]').textContent).toContain('10 分');
+      expect(node('[data-el="modal-title"]').textContent).toBe('Computer wins');
+      expect(node('[data-el="modal-description"]').textContent).toContain('First to 10');
       expect(session.refill).toHaveBeenCalledTimes(2);
     });
 
@@ -550,7 +550,7 @@ describe('continuous Challenge app and persistence', () => {
       session.view = { ...session.view, phase: 'selecting', currentPlayer: 0, activeCoinId: null, canSelectCoin: true, revision: session.view.revision + 1 };
       frames();
       expect(harness.inputState!().view).toMatchObject({ inputOwner: 'human', currentPlayer: 0, canSelectCoin: true });
-      expect(node('[data-el="prompt-title"]').textContent).toBe('点选一枚硬币直接开始');
+      expect(node('[data-el="prompt-title"]').textContent).toBe('Tap a coin to start');
     });
 
     it.each(['pause', 'home', 'restart', 'dispose'] as const)('%s cancels a pending computer result so the old turn never shoots', async action => {
@@ -631,8 +631,8 @@ describe('continuous Challenge app and persistence', () => {
       frames(150);
       expect(session.refill).not.toHaveBeenCalled(); expect(session.advanceRound).not.toHaveBeenCalled();
       expect(node('[data-el="modal-layer"]').hidden).toBe(false);
-      expect(node('[data-el="modal-title"]').textContent).toBe('玩家一获胜');
-      expect(node('[data-el="modal-score"]').textContent).toBe('玩家一 10  :  3 玩家二');
+      expect(node('[data-el="modal-title"]').textContent).toBe('Player 1 wins');
+      expect(node('[data-el="modal-score"]').textContent).toBe('Player 1 10  :  3 Player 2');
       expect(storage.setItem).not.toHaveBeenCalled();
     });
   });

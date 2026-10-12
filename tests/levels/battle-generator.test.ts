@@ -87,11 +87,11 @@ describe('random battle board', () => {
     }
   }, 10000);
   it('rejects nonfinite RNG and invalid retained coins rather than generating malformed layouts', () => {
-    expect(() => generateBattle(() => NaN)).toThrow(/随机数/);
-    expect(() => generateBattle(() => Infinity)).toThrow(/随机数/);
+    expect(() => generateBattle(() => NaN)).toThrow(/random value/);
+    expect(() => generateBattle(() => Infinity)).toThrow(/random value/);
     const level = generateBattle(() => 0);
     const bad = { id: 'bad', materialId: 'iron', position: { x: 0.8, y: 0.004, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } } as CoinTransform;
-    expect(() => generateBattleRefill(level, [bad])).toThrow(/无效/);
-    expect(() => generateBattleRefill(level, [bad, bad])).toThrow(/只能保留/);
+    expect(() => generateBattleRefill(level, [bad])).toThrow(/Invalid/);
+    expect(() => generateBattleRefill(level, [bad, bad])).toThrow(/can retain only/);
   });
 });

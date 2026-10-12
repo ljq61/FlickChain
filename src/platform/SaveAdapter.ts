@@ -19,7 +19,7 @@ export class SaveAdapter {
       this.storage = storage === undefined ? globalThis.localStorage ?? null : storage;
     } catch {
       this.storage = null;
-      this.lastError = '浏览器未允许保存进度，本次仍可正常游玩。';
+      this.lastError = 'Your browser blocked progress saving. You can still play.';
     }
   }
 
@@ -40,7 +40,7 @@ export class SaveAdapter {
         bestScore: safeScore(data.bestScore),
       };
     } catch {
-      this.lastError = '旧进度无法读取，已恢复默认设置。';
+      this.lastError = 'Saved progress could not be read. Default settings restored.';
       return { schemaVersion: 1, completed: [], sound: true, bestScore: 0 };
     }
   }
@@ -58,7 +58,7 @@ export class SaveAdapter {
       this.lastError = null;
       return true;
     } catch {
-      this.lastError = '进度暂未保存；可继续游玩，关闭页面后可能丢失。';
+      this.lastError = 'Progress was not saved. You can keep playing, but progress may be lost when you close this page.';
       return false;
     }
   }

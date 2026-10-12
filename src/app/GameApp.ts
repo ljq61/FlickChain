@@ -123,7 +123,7 @@ export class GameApp {
     this.session?.dispose();
     this.session = null;
     this.shell.setError(null);
-    this.shell.setLoading('正在准备桌面…');
+    this.shell.setLoading('Setting up the table...');
     try {
       await this.scene.initializeHand();
       if (this.disposed || generation !== this.generation) return;
@@ -150,7 +150,7 @@ export class GameApp {
       this.shell.setLoading(null);
       if (this.run) this.run.error = true;
       this.renderShell();
-      this.shell.setError(`桌面加载失败，请重新开始。${error instanceof Error ? error.message : ''}`);
+      this.shell.setError(`The table could not load. Please restart. ${error instanceof Error ? error.message : ''}`);
     }
   }
 
@@ -190,7 +190,7 @@ export class GameApp {
     this.game?.pause();
     this.sound.suspend();
     this.shell.setLoading(null);
-    this.shell.setError(`对战暂时无法继续，请重新开始。${error instanceof Error ? error.message : String(error)}`);
+    this.shell.setError(`The match could not continue. Please restart. ${error instanceof Error ? error.message : String(error)}`);
   }
 
   private async loadOpening(level: LevelConfig, variant: BattleVariant): Promise<void> {
@@ -202,7 +202,7 @@ export class GameApp {
     this.opening?.dispose(); this.opening = null;
     this.aim = null; this.lastFrame = null; this.previousView = null;
     this.sound.stopCurrentSounds();
-    this.shell.setError(null); this.shell.setLoading('正在准备先手挑战…');
+    this.shell.setError(null); this.shell.setLoading('Setting up the Opening Flick...');
     try {
       await this.scene.initializeHand();
       if (this.disposed || generation !== this.generation) return;
@@ -249,7 +249,7 @@ export class GameApp {
         this.cancelAI(); this.pointer.cancel(); this.aim = null;
         const retained = this.session.frame.coins;
         const level = generateBattleRefill(this.currentLevel!, retained, this.random, battle.variant);
-        if (!this.session.refill(level)) throw new Error('补币状态无效');
+        if (!this.session.refill(level)) throw new Error('Invalid coin refill state');
         const oldIds = new Set(retained.map(coin => coin.id));
         this.currentLevel = level; battle.level = level;
         this.scene.setLevel(level, true);
@@ -271,14 +271,14 @@ export class GameApp {
       this.aiDecision = null; this.aiPending = false; this.aiAge = 0;
       if (typeof decision !== 'number') {
         if (view.canSelectCoin) {
-          if (!this.session?.selectCoin(decision.coinId)) { this.failBattle('电脑选币无效'); return; }
+          if (!this.session?.selectCoin(decision.coinId)) { this.failBattle('The computer could not select a valid coin'); return; }
           this.scene.focusCoin(decision.coinId);
-        } else if (view.activeCoinId !== decision.coinId) { this.failBattle('电脑接力币已变化'); return; }
+        } else if (view.activeCoinId !== decision.coinId) { this.failBattle('The computer relay coin has changed'); return; }
       }
       const power = typeof decision === 'number' ? decision : decision.power;
       if (game.shoot(typeof decision === 'number' ? { x: 0, z: -1 } : decision.direction, power)) {
         this.impactIntensity = .3 + power * .7; this.sound.play('flick', power);
-      } else this.failBattle('电脑弹射状态无效');
+      } else this.failBattle('The computer could not make a valid shot');
       return;
     }
     if (this.aiPending || this.aiAge < .4) return;
@@ -364,7 +364,7 @@ export class GameApp {
     if (this.run) { this.run.error = true; this.run.transition = null; }
     this.pointer.cancel();
     this.sound.stopCurrentSounds();
-    this.shell.setError(`桌面暂时无法继续，请重新开始。${error instanceof Error ? error.message : String(error)}`);
+    this.shell.setError(`The run could not continue. Please restart. ${error instanceof Error ? error.message : String(error)}`);
   }
 
   private beginRoundTransition(): void {
@@ -382,11 +382,11 @@ export class GameApp {
     const tips: string[] = [];
     if (!this.run.seenIron && level.coins.some(coin => coin.materialId === 'iron')) {
       this.run.seenIron = true;
-      tips.push('青色铁币重量和摩擦力更大');
+      tips.push('Iron coins are heavier and have more friction.');
     }
     if (!this.run.seenMarble && level.table.materialId === 'marble') {
       this.run.seenMarble = true;
-      tips.push('大理石桌面比木头桌面更容易滑行，摩擦力更低');
+      tips.push('Marble is more slippery than wood.');
     }
     this.run.tutorial = tips.join('；') || undefined;
   }
@@ -399,7 +399,7 @@ export class GameApp {
       try {
         const retained = this.session.frame.coins;
         const level = generateRound(this.run.round + 1, retained, this.random);
-        if (!this.session.advanceRound(level)) throw new Error('下一轮接力状态无效');
+        if (!this.session.advanceRound(level)) throw new Error('Invalid next-round relay state');
         const oldIds = new Set(retained.map(coin => coin.id));
         this.run.round++;
         this.currentLevel = level;
@@ -419,7 +419,7 @@ export class GameApp {
     try {
       const retained = this.session.frame.coins;
       const level = generateRevival(this.currentLevel, retained, this.session.lastFallenCoinIds.length, this.random);
-      if (!this.session.revive(level)) throw new Error('复活状态无效');
+      if (!this.session.revive(level)) throw new Error('Invalid continue state');
       this.run.revivesRemaining--;
       this.run.transition = 'arriving';
       this.currentLevel = level;

@@ -3,7 +3,7 @@
     "levelId": "first-flick",
     "schemaVersion": 1,
     "configVersion": "campaign-materials-v4",
-    "configFingerprint": "b46fb1723c0f2d3d8056042b5351ea20481767a277a08d8e10a820629428fca0",
+    "configFingerprint": "a1f13021657574fef10bb47877f48aaf5d1c645f33c9ef6134d416a6bf57c374",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -20,7 +20,7 @@
     "levelId": "distance",
     "schemaVersion": 1,
     "configVersion": "campaign-materials-v4",
-    "configFingerprint": "781f42abf89f3191d0d690e61b5b10810f5e005cb14de9914070ff5f36a7330c",
+    "configFingerprint": "9879e835702480ce45ee347ebe31517e9579f800eb99c2bbd628e2398ad81f01",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -37,7 +37,7 @@
     "levelId": "turn-the-corner",
     "schemaVersion": 1,
     "configVersion": "campaign-materials-v4",
-    "configFingerprint": "dcffd07fda8827b6626e20e0a7718ed343c05fa69a6e54d917b8ca4bdc836587",
+    "configFingerprint": "99842ba9e49cb91b64783f4c071fe2cdbd97b7006e32a8a4eaa411ffa6f6313a",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -63,7 +63,7 @@
     "levelId": "zigzag",
     "schemaVersion": 1,
     "configVersion": "campaign-materials-v4",
-    "configFingerprint": "17cfe298ab0d467f9f460bba1ffb9b5f554ec584097def71c0b6ecfa91631a22",
+    "configFingerprint": "a9bed2bb2be55ade91df95518a798b0d5ea66163254f93b2a35300632c0b6ba3",
     "shots": [
       {
         "sourceCoinId": "a",
@@ -98,7 +98,7 @@
     "levelId": "full-chain",
     "schemaVersion": 1,
     "configVersion": "campaign-materials-v4",
-    "configFingerprint": "f0d33aa06394ef20e6df6216217bc68478ced1af6ecaaa57ba28eca922c75f68",
+    "configFingerprint": "9f0ff9ba137e0f96c465e66b3e28c688416e14cbf267ad7c7387d37d94de8b6c",
     "shots": [
       {
         "sourceCoinId": "a",

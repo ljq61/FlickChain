@@ -30,19 +30,19 @@ describe('worker decision ownership', () => {
     vi.useFakeTimers();
     const worker = new FakeWorker(), client = new AIClient(() => worker as unknown as Worker);
     const failed = client.chooseOpening(level());
-    const timeout = expect(failed).rejects.toThrow(/超时/);
+    const timeout = expect(failed).rejects.toThrow(/timed out/);
     await vi.advanceTimersByTimeAsync(10001); await timeout;
     expect(worker.terminate).toHaveBeenCalledOnce();
     const next = client.chooseOpening(level());
-    const error = expect(next).rejects.toThrow('WASM 失败');
-    worker.respond({ id: worker.requests[1].id, error: 'WASM 失败' }); await error;
+    const error = expect(next).rejects.toThrow('WASM failed');
+    worker.respond({ id: worker.requests[1].id, error: 'WASM failed' }); await error;
     client.dispose();
-    await expect(client.chooseOpening(level())).rejects.toThrow(/销毁/);
+    await expect(client.chooseOpening(level())).rejects.toThrow(/disposed/);
   });
   it('rejects malformed decisions rather than letting invalid power reach live physics', async () => {
     const worker = new FakeWorker(), client = new AIClient(() => worker as unknown as Worker);
     const decision = client.chooseOpening(level());
-    const invalid = expect(decision).rejects.toThrow(/无效决定/);
+    const invalid = expect(decision).rejects.toThrow(/invalid shot/);
     worker.respond({ id: worker.requests[0].id, kind: 'opening', power: NaN }); await invalid;
     expect(worker.terminate).toHaveBeenCalledOnce(); client.dispose();
   });

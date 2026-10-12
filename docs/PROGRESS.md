@@ -116,3 +116,10 @@
 当前剩余技术提示：Rapier初始化弃用提示、较大的JS分块；本轮构建未因此失败。GitHub源码、Pages公开站点、CrazyGames发布分别留证。完整任务契约见 [TASK_PLAN.md](TASK_PLAN.md)。
 
 本次独立只读审查关闭目标超距与贴币推动两项P2，复核生产物理回放、源币规则/CCD/继承/复活/操作权；最终177项测试、类型检查、构建与diff检查通过。未发现剩余可确认P1/P2，真机与平台边界如上。
+
+## dev_en English adaptation — 2026-10-12
+
+- Current English branch now ships English UI, teaching, results, recovery/storage messages, accessibility labels and level metadata; runtime/build content has no Chinese text. Gameplay/AI/save contracts are preserved.
+- Full regression:351 tests passed,1 explicit opt-in generation test skipped; types/build/diff checks passed. Original five solution replays retained, with metadata-only fingerprint refresh.
+- DPR1 browser checks:390×844,320×568,907×510,821×462,800×450; actual miss/Continue flow and production launch checked. Short-landscape long-result layout corrected.
+- Static ZIP:16 files,7,228,509B unpacked. Evidence and platform boundaries: [English adaptation validation](validation/english-2026-10-12/README.md). SDK/Preview/platform publication and real-device validation remain separate.

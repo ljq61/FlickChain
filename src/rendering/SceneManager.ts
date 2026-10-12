@@ -207,12 +207,12 @@ export class SceneManager {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.localClippingEnabled = true;
     this.canvas.className = 'game-canvas';
-    this.canvas.setAttribute('aria-label', '三维桌面棋盘，空白处拖动旋转视角；点选硬币直接开始，按住硬币后方的手指蓄力，松手弹射');
+    this.canvas.setAttribute('aria-label', '3D tabletop. Drag an empty area to rotate the view. Select a coin, then hold the finger behind it to charge and release to flick.');
     this.host.append(this.canvas);
     this.chargeMeter.className = 'charge-meter';
     this.chargeMeter.hidden = true;
     this.chargeMeter.setAttribute('role', 'progressbar');
-    this.chargeMeter.setAttribute('aria-label', '弹射蓄力');
+    this.chargeMeter.setAttribute('aria-label', 'Flick power');
     this.chargeMeter.setAttribute('aria-valuemin', '0');
     this.chargeMeter.setAttribute('aria-valuemax', '100');
     this.chargeMeter.setAttribute('aria-valuenow', '0');

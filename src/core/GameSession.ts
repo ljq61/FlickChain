@@ -32,9 +32,9 @@ export class GameSession {
     };
   }
   static async create(level: LevelConfig, mode: GameMode, firstPlayer: 0 | 1 = 0, battleWinScore: BattleWinScore = BATTLE_WIN_SCORE): Promise<GameSession> {
-    if ((mode !== 'challenge' && mode !== 'battle') || (firstPlayer !== 0 && firstPlayer !== 1)) throw new Error('无效模式或先手');
-    if (battleWinScore !== BATTLE_WIN_SCORE) throw new Error('无效对战目标分数');
-    if (level.purpose === 'opening') throw new Error('先手比较使用独立先手会话');
+    if ((mode !== 'challenge' && mode !== 'battle') || (firstPlayer !== 0 && firstPlayer !== 1)) throw new Error('Invalid game mode or first player');
+    if (battleWinScore !== BATTLE_WIN_SCORE) throw new Error('Invalid Battle target score');
+    if (level.purpose === 'opening') throw new Error('Opening Flick requires a separate opening session');
     const snapshot = structuredClone(level);
     const physics = await PhysicsWorld.create(snapshot);
     return new GameSession(physics, snapshot, mode, firstPlayer, battleWinScore);
@@ -44,7 +44,7 @@ export class GameSession {
   get lastFallenCoinIds(): readonly string[] { return [...this.lastFallenIds]; }
   /** AI clones the exact settled production world; no fresh-layout approximation. */
   exportSnapshot(): SessionSnapshot {
-    if (this.disposed || (this.state.phase !== 'ready' && this.state.phase !== 'selecting')) throw new Error('仅能导出可操作的静止游戏会话');
+    if (this.disposed || (this.state.phase !== 'ready' && this.state.phase !== 'selecting')) throw new Error('Only an interactive, settled game session can be exported');
     return { physics: this.physics.snapshot(), view: this.view, lastFallenIds: [...this.lastFallenIds] };
   }
   static async restore(input: SessionSnapshot): Promise<GameSession> {
@@ -59,11 +59,11 @@ export class GameSession {
       || !Number.isInteger(view.revision) || view.revision < 0 || typeof view.sessionId !== 'string' || !view.sessionId
       || snapshot.physics?.level?.purpose === 'opening' || view.levelId !== snapshot.physics?.level?.id
       || battleWinScore !== BATTLE_WIN_SCORE
-      || (view.mode === 'battle' && view.scores.some((score) => score >= battleWinScore))) throw new Error('游戏快照状态无效');
+      || (view.mode === 'battle' && view.scores.some((score) => score >= battleWinScore))) throw new Error('Invalid game snapshot state');
     const physics = await PhysicsWorld.restore(snapshot.physics);
     try {
       if (view.remaining !== physics.frame.coins.length || (view.phase === 'ready' && (!view.activeCoinId || !physics.hasCoin(view.activeCoinId)))
-        || (view.phase === 'selecting' && (!view.canSelectCoin || view.activeCoinId !== null))) throw new Error('游戏快照控制映射无效');
+        || (view.phase === 'selecting' && (!view.canSelectCoin || view.activeCoinId !== null))) throw new Error('Invalid game snapshot control mapping');
       const game = new GameSession(physics, snapshot.physics.level, view.mode, view.currentPlayer, battleWinScore);
       Object.assign(game.state, view); game.lastFallenIds = [...snapshot.lastFallenIds];
       if (view.mode === 'battle') game.state.battleWinScore = battleWinScore;
@@ -161,7 +161,7 @@ export class GameSession {
     if (result.outcome === 'SUCCESS' && !this.pendingRelay && !this.physics.canRemoveSource(result.sourceCoinId)) {
       if (!this.physics.hasCoin(result.targetCoinId) || !this.physics.releaseSupportingSource(result.sourceCoinId)) {
         this.physics.freeze(); this.facts = null; this.accumulator = 0;
-        this.state.phase = 'error'; this.state.error = '接力结算支撑异常，未移除当前币或加分。';
+        this.state.phase = 'error'; this.state.error = 'An unsupported coin prevented relay settlement. No point was awarded. Please restart the run or match.';
         this.state.revision++; return;
       }
       // Rapier now owns a small natural landing. Keep the original valid target,
@@ -176,12 +176,12 @@ export class GameSession {
     for (const id of facts.fallenCoinIds) this.physics.removeCoin(id);
     this.state.remaining = this.physics.frame.coins.length;
     if (timedOut && !supported) {
-      this.state.phase = 'error'; this.state.error = '模拟超时，存在未获得稳定桌面支撑的硬币。请重建本局。';
+      this.state.phase = 'error'; this.state.error = 'The shot timed out with an unsupported coin. Please restart the run or match.';
       this.state.revision++; return;
     }
     if (result.outcome === 'SUCCESS') {
       if (!this.physics.hasCoin(result.targetCoinId) || (sourceAlreadyRemoved ? !supported : !this.physics.canRemoveSource(result.sourceCoinId))) {
-        this.physics.freeze(); this.state.phase = 'error'; this.state.error = '接力结算支撑异常，未移除当前币或加分。';
+        this.physics.freeze(); this.state.phase = 'error'; this.state.error = 'An unsupported coin prevented relay settlement. No point was awarded. Please restart the run or match.';
         this.state.revision++; return;
       }
       if (!sourceAlreadyRemoved) this.physics.removeCoin(result.sourceCoinId);
@@ -220,6 +220,6 @@ export class GameSession {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true; this.facts = null; this.pendingRelay = false; this.accumulator = 0; this.feedback = []; this.physics.dispose();
-    this.state.phase = 'error'; this.state.canSelectCoin = false; this.state.error = '会话已销毁'; this.state.activeCoinId = null; this.state.remaining = 0; this.state.revision++;
+    this.state.phase = 'error'; this.state.canSelectCoin = false; this.state.error = 'The game session has been disposed'; this.state.activeCoinId = null; this.state.remaining = 0; this.state.revision++;
   }
 }

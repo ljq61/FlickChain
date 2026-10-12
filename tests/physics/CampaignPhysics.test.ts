@@ -41,7 +41,7 @@ describe('production campaign materials and reconfiguration', () => {
     } finally { equalGold.dispose(); equalIron.dispose(); }
     const pair = layout('iron'); pair.coins[0].x = 0; pair.coins[1].x = COIN_RADIUS * 2 + 0.004; pair.coins[1].z = 0;
     // A 74 mm separation accepts two gold coins but not the physically larger iron coin.
-    await expect(PhysicsWorld.create(pair)).rejects.toThrow(/重叠/);
+    await expect(PhysicsWorld.create(pair)).rejects.toThrow(/overlap/);
   });
   it('collides at the true enlarged iron rim where a standard coin passes without touching', async () => {
     const config = layout();
@@ -148,7 +148,7 @@ describe('production campaign materials and reconfiguration', () => {
         coins: [{ id: 'A', x: survivor.position.x, z: survivor.position.z, materialId: survivor.materialId },
           { id: 'C', x: 0, z: -0.3, materialId: 'standard' }],
       };
-      expect(() => PhysicsWorld.validate(next)).toThrow(/贴边/);
+      expect(() => PhysicsWorld.validate(next)).toThrow(/table edge/);
       const unsafe = structuredClone(next); unsafe.coins[1].x = 0.77; unsafe.coins[1].z = 0.1;
       expect(world.reconfigure(unsafe)).toBe(false); expect(world.frame.coins).toEqual([survivor]);
       expect(world.reconfigure(next)).toBe(true); expect(world.frame.coins[0]).toEqual(survivor);

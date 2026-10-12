@@ -3,10 +3,10 @@ import { TITLE_LOGO } from './TitleLogo';
 import './styles.css';
 
 const FOUL_TEXT: Record<FoulReason, string> = {
-  MISS: '没有碰到目标币',
-  MULTI_HIT: '当前币直接碰到了多枚目标币',
-  FALL: '有硬币掉下了桌面',
-  TIMEOUT: '硬币未能在时限内停稳',
+  MISS: 'No target coin hit',
+  MULTI_HIT: 'Hit more than one target coin',
+  FALL: 'A coin fell off the table',
+  TIMEOUT: 'Coins did not stop in time',
 };
 
 const COIN_ICON = '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="24" r="16" stroke="currentColor"/><circle cx="24" cy="24" r="12" stroke="currentColor" stroke-width="1.5"/><path d="M24 4v4m20 16h-4M24 44v-4M4 24h4" stroke="currentColor" stroke-width="2"/></svg>';
@@ -51,24 +51,25 @@ export class Shell {
     this.element.innerHTML = `
       <div class="table-scene" data-el="canvas-host"></div>
       <header class="topbar">
-        <div class="brand"><span class="brand-mark">${COIN_ICON}</span><div><span class="brand-name">一弹到底</span><span class="brand-english">FLICKCHAIN</span></div></div>
-        <nav class="corner-controls" aria-label="声音与设置">
-        <button class="quiet-button sound-button" type="button" data-action="sound" data-el="sound" aria-pressed="true" aria-label="声音 开"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M5 10h5l6-5v18l-6-5H5V10Z" fill="currentColor" stroke="currentColor" stroke-linejoin="round"/><path class="sound-waves" d="M20 9a7 7 0 0 1 0 10m3-13a11 11 0 0 1 0 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="sound-muted" d="m20 11 6 6m0-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="status-label" data-el="sound-label">声音 开</span></button>
-        <button type="button" class="quiet-button settings-button" data-action="pause" data-el="pause" aria-label="设置" hidden><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="m11.5 3-.7 3-2 .9-2.7-.8-2.5 4.3 2 2.2v2.8l-2 2.2 2.5 4.3 2.7-.8 2 .9.7 3h5l.7-3 2-.9 2.7.8 2.5-4.3-2-2.2v-2.8l2-2.2-2.5-4.3-2.7.8-2-.9-.7-3h-5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="14" cy="14" r="4" stroke="currentColor" stroke-width="1.7"/></svg></button>
+        <div class="brand"><span class="brand-mark">${COIN_ICON}</span><div><span class="brand-name">FlickChain</span></div></div>
+        <nav class="corner-controls" aria-label="Sound and settings">
+        <button class="quiet-button sound-button" type="button" data-action="sound" data-el="sound" aria-pressed="true" aria-label="Sound on"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M5 10h5l6-5v18l-6-5H5V10Z" fill="currentColor" stroke="currentColor" stroke-linejoin="round"/><path class="sound-waves" d="M20 9a7 7 0 0 1 0 10m3-13a11 11 0 0 1 0 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="sound-muted" d="m20 11 6 6m0-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="status-label" data-el="sound-label">Sound on</span></button>
+        <button type="button" class="quiet-button settings-button" data-action="pause" data-el="pause" aria-label="Game settings" hidden><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="m11.5 3-.7 3-2 .9-2.7-.8-2.5 4.3 2 2.2v2.8l-2 2.2 2.5 4.3 2.7-.8 2 .9.7 3h5l.7-3 2-.9 2.7.8 2.5-4.3-2-2.2v-2.8l2-2.2-2.5-4.3-2.7.8-2-.9-.7-3h-5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="14" cy="14" r="4" stroke="currentColor" stroke-width="1.7"/></svg></button>
         </nav>
       </header>
+      <div class="game-brand" data-el="game-brand" aria-hidden="true" hidden>${TITLE_LOGO}</div>
       <main class="home-menu" data-el="home">
-        <div class="menu-intro"><h1 class="title-logo" aria-label="一弹到底">${TITLE_LOGO}</h1></div>
-        <div class="menu-actions" data-el="main-actions"><button type="button" class="primary-button menu-button" data-action="challenge"><span class="button-icon">${COIN_ICON}</span><span class="button-label">单人游戏</span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button" data-action="battle"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">本地对战</span>${CHEVRON_ICON}</button><p class="menu-progress" data-el="progress">本地最高 0 分</p></div>
-        <div class="menu-actions battle-menu" data-el="battle-actions" hidden><div class="battle-menu-heading"><button type="button" class="quiet-button menu-back" data-action="battle-back" aria-label="返回主界面" title="返回主界面">${BACK_ICON}</button><h2>本地对战</h2></div><button type="button" class="primary-button menu-button battle-choice" data-action="pvp" aria-label="PVP 玩家对战"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">PVP<small>玩家对战</small></span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button battle-choice" data-action="pve" aria-label="PVE 人机对战"><span class="button-icon">${COMPUTER_ICON}</span><span class="button-label">PVE<small>人机对战</small></span>${CHEVRON_ICON}</button><p class="menu-progress">比远争先 · 先得 10 分获胜</p></div>
-        <p class="table-caption">同一张桌，所有硬币都公共</p>
+        <div class="menu-intro"><h1 class="title-logo" aria-label="FlickChain">${TITLE_LOGO}</h1></div>
+        <div class="menu-actions" data-el="main-actions"><button type="button" class="primary-button menu-button" data-action="challenge"><span class="button-icon">${COIN_ICON}</span><span class="button-label">Solo Play</span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button" data-action="battle"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">Local Battle</span>${CHEVRON_ICON}</button><p class="menu-progress" data-el="progress">Best: 0</p></div>
+        <div class="menu-actions battle-menu" data-el="battle-actions" hidden><div class="battle-menu-heading"><button type="button" class="quiet-button menu-back" data-action="battle-back" aria-label="Back to Main Menu" title="Back to Main Menu">${BACK_ICON}</button><h2>Local Battle</h2></div><button type="button" class="primary-button menu-button battle-choice" data-action="pvp" aria-label="PVP: Player vs Player"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">PVP<small>Two Players</small></span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button battle-choice" data-action="pve" aria-label="PVE: Play vs Computer"><span class="button-icon">${COMPUTER_ICON}</span><span class="button-label">PVE<small>vs Computer</small></span>${CHEVRON_ICON}</button><p class="menu-progress">Opening Flick · First to 10</p></div>
+        <p class="table-caption">One table. Every coin is shared.</p>
       </main>
-      <section class="game-hud" data-el="hud" hidden aria-label="对局信息"><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><strong data-el="score-one">0</strong><span data-el="score-one-label">分</span></div><div class="score-cell" data-el="player-two" hidden><span data-el="score-two-label">玩家二</span><strong data-el="score-two">0</strong></div><div class="remaining-cell" data-el="remaining-cell"><strong data-el="remaining">3</strong><span data-el="remaining-label">次机会</span></div></div><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective" hidden>留住最后一枚，继续下一轮</p></div></div></section>
-      <footer class="play-footer" data-el="footer" hidden><div class="shot-prompt" data-el="shot-prompt"><div class="turn-label" data-el="turn-label" hidden></div><h2 data-el="prompt-title">旋转视角，准备弹射</h2><p data-el="prompt-description">空白处拖动旋转 · 点选硬币开始</p><p class="tutorial-tip" data-el="tutorial-tip" hidden></p></div><p class="best-score" data-el="best-score" hidden>本地最高 0 分</p></footer>
+      <section class="game-hud" data-el="hud" hidden aria-label="Game information"><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><strong data-el="score-one">0</strong><span data-el="score-one-label">Score</span></div><div class="score-cell" data-el="player-two" hidden><span data-el="score-two-label">Player 2</span><strong data-el="score-two">0</strong></div><div class="remaining-cell" data-el="remaining-cell"><strong data-el="remaining">3</strong><span data-el="remaining-label">Continues</span></div></div><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective" hidden>Keep the last coin for the next round</p></div></div></section>
+      <footer class="play-footer" data-el="footer" hidden><div class="shot-prompt" data-el="shot-prompt"><div class="turn-label" data-el="turn-label" hidden></div><h2 data-el="prompt-title">Rotate the view, then flick</h2><p data-el="prompt-description">Drag empty space to rotate · Tap a coin to start</p><p class="tutorial-tip" data-el="tutorial-tip" hidden></p></div><p class="best-score" data-el="best-score" hidden>Best: 0</p></footer>
       <div class="status-live" data-el="live" role="status" aria-live="polite" aria-atomic="true"></div>
-      <aside class="notice-toast" data-el="notice" hidden aria-label="保存提示"><p data-el="notice-message" role="status"></p><button type="button" class="notice-dismiss" data-action="dismiss-notice" aria-label="关闭保存提示">关闭</button></aside>
-      <div class="loading-layer" data-el="loading" hidden><div class="loading-card" role="status"><span class="loading-dot" aria-hidden="true"></span><p data-el="loading-message">正在准备棋盘</p></div></div>
-      <div class="modal-layer" data-el="modal-layer" hidden><section class="result-card" data-el="modal" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-description" tabindex="-1"><div class="bill-seal" data-el="modal-seal" aria-hidden="true">${COIN_ICON}</div><p class="eyebrow" data-el="modal-kicker">这一局</p><h2 id="result-title" data-el="modal-title"></h2><p id="result-description" data-el="modal-description"></p><div class="result-score" data-el="modal-score"></div><div class="modal-actions"><button type="button" class="primary-button" data-el="modal-primary" data-action="retry">再试一次</button><button type="button" class="secondary-button" data-el="modal-secondary" data-action="home">返回菜单</button><button type="button" class="text-button" data-el="modal-tertiary" data-action="home" hidden>返回菜单</button></div></section></div>`;
+      <aside class="notice-toast" data-el="notice" hidden aria-label="Save notice"><p data-el="notice-message" role="status"></p><button type="button" class="notice-dismiss" data-action="dismiss-notice" aria-label="Dismiss save notice">Dismiss</button></aside>
+      <div class="loading-layer" data-el="loading" hidden><div class="loading-card" role="status"><span class="loading-dot" aria-hidden="true"></span><p data-el="loading-message">Preparing the table</p></div></div>
+      <div class="modal-layer" data-el="modal-layer" hidden><section class="result-card" data-el="modal" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-description" tabindex="-1"><div class="bill-seal" data-el="modal-seal" aria-hidden="true">${COIN_ICON}</div><p class="eyebrow" data-el="modal-kicker">This game</p><h2 id="result-title" data-el="modal-title"></h2><p id="result-description" data-el="modal-description"></p><div class="result-score" data-el="modal-score"></div><div class="modal-actions"><button type="button" class="primary-button" data-el="modal-primary" data-action="retry">Try Again</button><button type="button" class="secondary-button" data-el="modal-secondary" data-action="home">Main Menu</button><button type="button" class="text-button" data-el="modal-tertiary" data-action="home" hidden>Main Menu</button></div></section></div>`;
     this.root.append(this.element);
     this.element.querySelectorAll<HTMLElement>('[data-el]').forEach((element) => this.elements.set(element.dataset.el!, element));
     const signal = this.events.signal;
@@ -120,39 +121,40 @@ export class Shell {
     this.element.dataset.mode = view?.mode ?? 'menu';
     this.element.dataset.phase = view?.phase === 'paused' ? 'paused' : transition ?? (introducing ? 'introducing' : view?.phase ?? 'menu');
     this.node('home').hidden = !!view;
+    this.node('game-brand').hidden = !view;
     this.node('hud').hidden = !view;
     this.node('footer').hidden = !view;
     this.node('pause').hidden = !view;
-    this.text('sound-label', sound ? '声音 开' : '已静音');
-    this.node('sound').setAttribute('aria-label', sound ? '声音 开' : '已静音');
+    this.text('sound-label', sound ? 'Sound on' : 'Sound off');
+    this.node('sound').setAttribute('aria-label', sound ? 'Sound on' : 'Sound off');
     this.node('sound').setAttribute('aria-pressed', String(sound));
     this.element.querySelectorAll<HTMLButtonElement>('.home-menu button').forEach((button) => { button.disabled = !!this.loading; });
-    this.text('progress', `本地最高 ${campaign?.bestScore ?? 0} 分`);
+    this.text('progress', `Best: ${campaign?.bestScore ?? 0}`);
     if (view) {
       const battle = view.mode === 'battle';
       const opening = battle && view.battle?.stage === 'opening';
       const computer = view.inputOwner === 'computer';
       const winScore = view.battleWinScore ?? 10;
-      const playerNames = view.battle?.variant === 'pve' ? ['你', '电脑'] : ['玩家一', '玩家二'];
+      const playerNames = view.battle?.variant === 'pve' ? ['You', 'Computer'] : ['Player 1', 'Player 2'];
       const currentName = playerNames[view.currentPlayer];
       this.element.dataset.battleStage = view.battle?.stage ?? '';
       const round = campaign?.round ?? 1;
-      this.text('mode', battle ? `${view.battle?.variant === 'pve' ? '人机' : '双人'}抢 ${winScore} 分` : '');
+      this.text('mode', battle ? `First to ${winScore}` : '');
       this.node('mode').hidden = !battle;
-      this.text('level-name', battle ? opening ? '比远争先' : '' : `第 ${round} 轮`);
+      this.text('level-name', battle ? opening ? 'Opening Flick' : '' : `Round ${round}`);
       this.node('level-name').hidden = battle && !opening;
-      this.text('objective', '合法接力 +1 · 失误换手');
+      this.text('objective', 'Hit one target: +1 · Miss or foul: switch turns');
       this.node('objective').hidden = !battle || opening;
-      this.text('best-score', `本地最高 ${campaign?.bestScore ?? 0} 分`);
+      this.text('best-score', `Best: ${campaign?.bestScore ?? 0}`);
       this.node('best-score').hidden = false;
-      this.text('score-one-label', battle ? playerNames[0] : '分');
+      this.text('score-one-label', battle ? playerNames[0] : 'Score');
       this.text('score-two-label', playerNames[1]);
-      const openingDistance = (player: 0 | 1): string => view.battle!.fallen[player] ? '掉落弃权'
-        : view.battle!.distances[player] === null ? '未弹' : `${Math.round(view.battle!.distances[player]! * 100)} cm`;
+      const openingDistance = (player: 0 | 1): string => view.battle!.fallen[player] ? 'Forfeit'
+        : view.battle!.distances[player] === null ? 'Ready' : `${Math.round(view.battle!.distances[player]! * 100)} cm`;
       this.text('score-one', opening ? openingDistance(0) : String(battle ? view.scores[0] : campaign?.score ?? view.scores[0]));
       this.text('score-two', opening ? openingDistance(1) : String(view.scores[1]));
       this.text('remaining', String(battle ? view.remaining : campaign?.revivesRemaining ?? 3));
-      this.text('remaining-label', battle ? '枚剩余' : '次机会');
+      this.text('remaining-label', battle ? 'Coins left' : (campaign?.revivesRemaining ?? 3) === 1 ? 'Continue' : 'Continues');
       this.node('remaining-cell').hidden = !!opening;
       this.node('player-two').hidden = !battle;
       this.node('player-one').dataset.active = String(battle && view.currentPlayer === 0);
@@ -160,56 +162,56 @@ export class Shell {
       this.node<HTMLButtonElement>('pause').disabled = ['failed', 'error'].includes(view.phase) || (battle && view.phase === 'complete' && !opening);
       const failedDuringShot = view.phase === 'simulating' && view.foulReasons.length > 0;
       this.node('shot-prompt').dataset.foul = String(failedDuringShot);
-      let title = '旋转视角，准备弹射';
-      let description = '空白处拖动旋转视角；点选硬币开始';
-      let turn = battle ? `${currentName}的回合` : '';
+      let title = 'Rotate the view, then flick';
+      let description = 'Drag empty space to rotate; tap a coin to start';
+      let turn = battle ? currentName === 'You' ? 'Your turn' : `${currentName}'s turn` : '';
       if (view.phase === 'paused') {
-        title = '棋盘已暂停'; description = '继续后从当前棋盘接着玩'; turn = '稍作休息';
+        title = 'Game paused'; description = 'Resume to continue from this table'; turn = 'Taking a break';
       } else if (opening && view.phase !== 'error') {
-        title = view.phase === 'complete' ? view.battle!.fallen[view.currentPlayer] ? `${currentName}掉落，放弃先手` : `${currentName}弹出 ${openingDistance(view.currentPlayer)}`
-          : computer ? '电脑正在比远' : '比远争先';
-        description = view.phase === 'simulating' ? '等这枚金币停稳，记录弹出的距离'
-          : view.phase === 'complete' ? view.winner === 0 || view.winner === 1 ? `${playerNames[view.winner]}获得先手，准备九枚硬币`
-            : '准备下一位；同距或双方掉落会重新比远'
-          : computer ? '各弹一枚，停稳更远者先手，掉落放弃先手'
-          : '按住手指蓄力，松手直弹；停稳更远者先手，掉落放弃先手';
-        turn = `第 ${view.battle!.openingAttempt} 次比远 · ${currentName}`;
+        title = view.phase === 'complete' ? view.battle!.fallen[view.currentPlayer] ? `${currentName === 'You' ? 'Your' : `${currentName}'s`} coin fell off` : `${currentName} flicked ${openingDistance(view.currentPlayer)}`
+          : computer ? 'Computer is flicking' : 'Opening Flick';
+        description = view.phase === 'simulating' ? 'Wait for the coin to stop before measuring its distance'
+          : view.phase === 'complete' ? view.winner === 0 || view.winner === 1 ? `${view.winner === 0 && view.battle?.variant === 'pve' ? 'You go' : `${playerNames[view.winner]} goes`} first. Setting out nine coins.`
+            : 'Next player. A tie or two fallen coins means another Opening Flick.'
+          : computer ? 'Each player flicks once. The farthest resting coin goes first; falling forfeits.'
+          : 'Hold the finger to charge; release to flick. Farthest goes first; falling forfeits.';
+        turn = `Opening Flick ${view.battle!.openingAttempt} · ${currentName}`;
       } else if (view.phase === 'refilling') {
-        title = view.battle?.variant === 'pve' ? '随机新增八枚硬币' : '重新摆满九枚硬币'; description = '残局和双方分数保留，硬币落稳后继续'; turn = '正在摆桌';
+        title = view.battle?.variant === 'pve' ? 'Adding eight new coins' : 'Refilling to nine coins'; description = 'The table and scores stay. Play resumes when the coins settle.'; turn = 'Setting the table';
       } else if (transition === 'clearing' || (challenge && view.phase === 'complete')) {
-        title = '留住这一枚，下一轮接着来'; description = '整理桌面，准备新的硬币'; turn = '本轮接力完成';
+        title = 'Keep this coin for the next round'; description = 'Clearing the table for new coins'; turn = 'Round complete';
       } else if (transition === 'arriving' || introducing) {
-        title = '硬币轻落桌面';
-        description = view.activeCoinId ? '新硬币落稳后，从留下的这枚继续' : '稍等片刻，落稳后点选一枚开始';
-        turn = '正在摆桌';
+        title = 'Coins are landing';
+        description = view.activeCoinId ? 'Continue from the remaining coin when the new coins settle' : 'Wait for the coins to settle, then tap one to start';
+        turn = 'Setting the table';
       } else if (view.phase === 'selecting') {
-        title = computer ? '电脑思考中' : '点选一枚硬币直接开始';
-        description = computer ? '稍等片刻，电脑会选择并弹射一枚硬币' : '点中的硬币立即成为当前币；旋转空白区域可改变视角';
+        title = computer ? 'Computer is thinking' : 'Tap a coin to start';
+        description = computer ? 'The computer is choosing a coin and planning its shot' : 'Hit exactly one target, then play from that coin. Drag empty space to rotate.';
       } else if (view.phase === 'ready') {
-        title = computer ? '电脑思考中' : '按住硬币后的手指蓄力';
-        description = computer ? '让这一杆停稳后，再继续对战' : view.canSelectCoin
-          ? '发射前可点其他硬币换起手；按得越久力度越大，松手弹射'
-          : '接着刚击中的硬币继续；按得越久力度越大，松手弹射';
+        title = computer ? 'Computer is thinking' : 'Hold the finger to charge';
+        description = computer ? 'The computer is planning its next flick' : view.canSelectCoin
+          ? 'Tap another coin to switch. Hold longer for power; release to flick.'
+          : 'Continue from the coin you hit. Hold longer for power; release to flick.';
       } else if (failedDuringShot) {
         title = view.foulReasons.map((reason) => FOUL_TEXT[reason]).join(' · ');
-        description = battle ? '本杆不得分，停稳后交给下一位玩家' : '停稳后查看本次结果'; turn = '失误 · 正在收尾';
+        description = battle ? 'No point for this shot. The next player takes over when the coins stop.' : 'Wait for the coins to stop to see the result'; turn = 'Foul · Settling';
       } else if (view.phase === 'simulating') {
-        title = '让硬币停一停'; description = '整杆停稳后，才能计分并接力'; turn = '弹射中';
+        title = 'Let the coins settle'; description = 'Score and the next active coin are confirmed when all coins stop'; turn = 'Shot in motion';
       } else if (view.phase === 'complete') {
-        title = '这一局结束了'; description = '再来一局，接得更远'; turn = '接力完成';
+        title = 'Game over'; description = 'Play again and build a longer chain'; turn = 'Chain complete';
       } else if (view.phase === 'failed') {
         const revives = campaign?.revivesRemaining ?? 3;
-        title = revives > 0 ? `还剩 ${revives} 次复活机会` : '本次闯关结束';
-        description = view.foulReasons.map((reason) => FOUL_TEXT[reason]).join(' · '); turn = '这一杆没接住';
+        title = revives > 0 ? `${revives} ${revives === 1 ? 'continue' : 'continues'} left` : 'Run over';
+        description = view.foulReasons.map((reason) => FOUL_TEXT[reason]).join(' · '); turn = 'Chain broken';
       } else if (view.phase === 'error') {
-        title = '棋盘需要重新准备'; description = '重新开始，或返回菜单'; turn = '已暂停操作';
+        title = 'Reset the table'; description = 'Restart or return to the Main Menu'; turn = 'Controls paused';
       }
       this.text('turn-label', turn);
       this.node('turn-label').hidden = !turn;
       this.text('prompt-title', title);
       this.text('prompt-description', description);
       const chargeTip = challenge && view.phase === 'ready' && !introducing && !transition && round <= 2 && view.shotCount < 3
-        ? '满力后持续按住2秒会蓄力失败，请松手重新蓄力'
+        ? 'At full power, holding for 2 more seconds cancels. Release to reset.'
         : '';
       const tutorial = challenge && !['paused', 'failed', 'error', 'complete'].includes(view.phase)
         ? [campaign?.tutorial, chargeTip].filter(Boolean).join('\n')
@@ -217,7 +219,11 @@ export class Shell {
       this.text('tutorial-tip', tutorial);
       this.node('tutorial-tip').hidden = !tutorial;
       const announcement = `${view.sessionId}:${view.phase}:${transition}:${introducing}:${round}:${view.currentPlayer}:${view.canSelectCoin}:${view.shotCount}:${view.foulReasons.join(',')}:${tutorial}:${computer}:${view.battle?.stage}:${view.battle?.openingAttempt}:${view.battle?.distances.join(',')}:${view.battle?.fallen.join(',')}`;
-      if (announcement !== this.announced) { this.announced = announcement; this.text('live', [turn, title, description, tutorial].filter(Boolean).join('。')); }
+      if (announcement !== this.announced) {
+        this.announced = announcement;
+        this.text('live', [turn, title, description, tutorial].filter(Boolean)
+          .map((part) => /[.!?]$/.test(part) ? part : `${part}.`).join(' '));
+      }
     } else {
       this.announced = '';
       this.text('live', '');
@@ -274,36 +280,36 @@ export class Shell {
       let title = '';
       let description = '';
       let score = '';
-      this.text('modal-kicker', state === 'paused' ? '设置' : state === 'error' ? '恢复棋盘' : view?.mode === 'battle' ? '本地对战 · 对局结果' : '单人闯关 · 本次结果');
-      if (state !== 'paused') this.button('modal-tertiary', '返回菜单', 'home', true);
+      this.text('modal-kicker', state === 'paused' ? 'Settings' : state === 'error' ? 'Reset the table' : view?.mode === 'battle' ? 'Local Battle · Game Result' : 'Solo Play · Run Result');
+      if (state !== 'paused') this.button('modal-tertiary', 'Main Menu', 'home', true);
       if (state === 'paused') {
-        title = '游戏设置';
-        this.button('modal-primary', '继续游戏', 'pause', false, PLAY_ICON);
-        this.button('modal-secondary', '重新开始', 'retry', false, RESTART_ICON);
-        this.button('modal-tertiary', '返回菜单', 'home', false, HOME_ICON);
+        title = 'Game Settings';
+        this.button('modal-primary', 'Resume', 'pause', false, PLAY_ICON);
+        this.button('modal-secondary', 'Restart', 'retry', false, RESTART_ICON);
+        this.button('modal-tertiary', 'Main Menu', 'home', false, HOME_ICON);
       } else if (state === 'error') {
-        title = '重新准备一下棋盘';
-        description = error ?? '本局出现异常，请重建棋盘后继续。';
-        this.button('modal-primary', '重建本局', 'retry');
-        this.button('modal-secondary', '返回菜单', 'home');
+        title = 'Reset the table';
+        description = error ?? 'Something went wrong. Restart to prepare the table again.';
+        this.button('modal-primary', 'Restart', 'retry');
+        this.button('modal-secondary', 'Main Menu', 'home');
       } else if (state === 'failed') {
         const revives = this.campaign?.revivesRemaining ?? 3;
         const revive = view?.mode === 'challenge' && revives > 0 && !!this.callbacks.revive;
-        title = revive ? '这一杆没接住' : '本次闯关结束';
-        description = view!.foulReasons.map((reason) => FOUL_TEXT[reason]).join('；') + '。'
-          + (revive ? (view!.foulReasons.includes('FALL') ? '补回掉落的硬币，重新选择一枚继续。' : '桌面和累计分保留，重新选择一枚继续。') + `剩余 ${revives} 次复活机会。` : '再来一局，接得更远。');
-        score = `累计 ${this.campaign?.score ?? view!.scores[0]} 分 · 最高 ${this.campaign?.bestScore ?? 0} 分\n到达第 ${this.campaign?.round ?? 1} 轮`;
-        this.button('modal-primary', revive ? '复活继续' : '再来一局', revive ? 'revive' : 'retry');
-        this.button('modal-secondary', revive ? '重新开始' : '返回菜单', revive ? 'retry' : 'home');
-        this.button('modal-tertiary', '返回菜单', 'home', !revive);
+        title = revive ? 'Chain broken' : 'Run over';
+        description = view!.foulReasons.map((reason) => FOUL_TEXT[reason]).join('; ') + '. '
+          + (revive ? (view!.foulReasons.includes('FALL') ? 'Fallen coins return. Choose a coin to continue. ' : 'Your table and score stay. Choose a coin to continue. ') + `${revives} ${revives === 1 ? 'continue' : 'continues'} left.` : 'Play again and build a longer chain.');
+        score = `Score: ${this.campaign?.score ?? view!.scores[0]} · Best: ${this.campaign?.bestScore ?? 0}\nRound ${this.campaign?.round ?? 1} reached`;
+        this.button('modal-primary', revive ? 'Continue Run' : 'Play Again', revive ? 'revive' : 'retry');
+        this.button('modal-secondary', revive ? 'Restart' : 'Main Menu', revive ? 'retry' : 'home');
+        this.button('modal-tertiary', 'Main Menu', 'home', !revive);
       } else if (view?.mode === 'battle') {
-        const names = view.battle?.variant === 'pve' ? ['你', '电脑'] : ['玩家一', '玩家二'];
+        const names = view.battle?.variant === 'pve' ? ['You', 'Computer'] : ['Player 1', 'Player 2'];
         const winScore = view.battleWinScore ?? 10;
-        title = view.winner === 'draw' ? '势均力敌，平局' : `${names[view.winner === 0 ? 0 : 1]}获胜`;
-        description = `先得 ${winScore} 分者胜利，每一次合法接力都算数。`;
+        title = view.winner === 'draw' ? 'Draw' : view.winner === 0 && view.battle?.variant === 'pve' ? 'You win' : `${names[view.winner === 0 ? 0 : 1]} wins`;
+        description = `First to ${winScore} wins. Each valid one-target hit scores a point.`;
         score = `${names[0]} ${view.scores[0]}  :  ${view.scores[1]} ${names[1]}`;
-        this.button('modal-primary', '再来一局', 'retry');
-        this.button('modal-secondary', '返回菜单', 'home');
+        this.button('modal-primary', 'Play Again', 'retry');
+        this.button('modal-secondary', 'Main Menu', 'home');
       }
       this.text('modal-title', title);
       this.text('modal-description', description);

@@ -5,7 +5,7 @@ import { PhysicsWorld } from '../../src/physics/PhysicsWorld';
 import { PHYSICS_CONFIG } from '../../src/physics/MaterialRegistry';
 import type { LevelConfig } from '../../src/types/contracts';
 
-const level = (): LevelConfig => ({ schemaVersion: 1, purpose: 'opening', id: 'opening', name: '先手', lesson: '距离',
+const level = (): LevelConfig => ({ schemaVersion: 1, purpose: 'opening', id: 'opening', name: 'Opening Flick', lesson: 'Distance',
   table: { width: 1.2, depth: 1.6, materialId: 'wood' }, coins: [{ id: 'opener', x: 0, z: .64, materialId: 'standard' }], activeCoinId: 'opener', obstacles: [] });
 const sessions: OpeningSession[] = [];
 async function create(variant: 'pvp' | 'pve' = 'pvp') { const game = await OpeningSession.create(level(), variant); sessions.push(game); return game; }
@@ -74,13 +74,13 @@ describe('production-physics opening distance comparison', () => {
     const game = await create();
     for (const [direction, power] of [[{ x: NaN, z: 1 }, .3], [{ x: 0, z: 0 }, .3], [{ x: 0, z: -1 }, 1.1], [{ x: 0, z: -1 }, .01]] as const) expect(game.shoot(direction, power)).toBe(false);
     expect(game.view.shotCount).toBe(0);
-    await expect(GameSession.create(level(), 'battle')).rejects.toThrow('先手');
+    await expect(GameSession.create(level(), 'battle')).rejects.toThrow('Opening Flick');
     const iron = level(); iron.coins[0].materialId = 'iron';
-    await expect(OpeningSession.create(iron, 'pvp')).rejects.toThrow('金币');
+    await expect(OpeningSession.create(iron, 'pvp')).rejects.toThrow('gold coin');
     const obstacle = level(); obstacle.obstacles.push({ id: 'glass', kind: 'glass', x: .2, z: 0, width: .12, depth: .12 });
-    await expect(OpeningSession.create(obstacle, 'pvp')).rejects.toThrow('障碍');
+    await expect(OpeningSession.create(obstacle, 'pvp')).rejects.toThrow('obstacles');
     const ordinary = level(); delete ordinary.purpose;
-    await expect(PhysicsWorld.create(ordinary)).rejects.toThrow('两枚');
+    await expect(PhysicsWorld.create(ordinary)).rejects.toThrow('at least two coins');
   });
   it('prevents overlapping advances and never resurrects a disposed session during async creation', async () => {
     const game = await create(); game.shoot({ x: 0, z: -1 }, .3); finish(game);

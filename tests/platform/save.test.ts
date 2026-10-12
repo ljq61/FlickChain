@@ -21,7 +21,7 @@ describe('progress storage recovery', () => {
   it('reports quota or permission failure without throwing', () => {
     const adapter = new SaveAdapter(['one'], { getItem: () => null, setItem: () => { throw new Error('quota'); } });
     expect(adapter.write({ schemaVersion: 1, completed: ['one'], sound: true, bestScore: 9 })).toBe(false);
-    expect(adapter.lastError).toContain('未保存');
+    expect(adapter.lastError).toContain('not saved');
   });
 
   it('persists the best score across a new adapter and safely migrates old preferences', () => {

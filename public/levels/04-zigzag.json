@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "id": "zigzag",
-  "name": "04 · 曲折有路",
-  "lesson": "轻轻接力，给下一杆留下空间。目标被推出桌边也会失败。",
+  "name": "04 · Winding Path",
+  "lesson": "Flick gently to leave room for your next shot. You also fail if a target falls off the table.",
   "table": { "shape": "circle", "width": 1.6, "depth": 1.6, "materialId": "wood" },
   "coins": [
     { "id": "a", "x": -0.3, "z": 0.43, "materialId": "standard" },

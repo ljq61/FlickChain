@@ -66,10 +66,10 @@ export async function searchBattle(snapshot: SessionSnapshot, options: SearchOpt
   let shots: AiShot[], fallback: AiShot, player: 0 | 1;
   try {
     const view = baseline.view, frame = baseline.frame;
-    if (view.mode !== 'battle' || (view.phase !== 'selecting' && view.phase !== 'ready')) throw new Error('电脑只能从已结算对战状态思考');
+    if (view.mode !== 'battle' || (view.phase !== 'selecting' && view.phase !== 'ready')) throw new Error('The computer can plan a shot only from a settled Battle state');
     player = view.currentPlayer;
     const sources = view.canSelectCoin ? frame.coins : frame.coins.filter((coin) => coin.id === view.activeCoinId);
-    if (!sources.length) throw new Error('电脑没有合法的当前硬币');
+    if (!sources.length) throw new Error('The computer has no valid active coin');
     const source = sources[0];
     const distance = Math.hypot(source.position.x, source.position.z);
     fallback = { coinId: source.id, direction: distance > 1e-6 ? { x: -source.position.x / distance, z: -source.position.z / distance } : { x: 0, z: -1 }, power: PHYSICS_CONFIG.minPower };
@@ -130,7 +130,7 @@ export async function chooseCasualBattle(snapshot: SessionSnapshot, random: () =
 }
 /** Opening chooses among moderate production-verified shots instead of maximizing distance. */
 export async function searchOpening(level: LevelConfig, random: () => number = Math.random): Promise<number> {
-  if (level.purpose !== 'opening') throw new Error('先手思考需要专用空桌面');
+  if (level.purpose !== 'opening') throw new Error('Opening Flick planning requires a dedicated empty table');
   const started = performance.now();
   const safePowers: number[] = [];
   for (const power of CASUAL_AI_PROFILE.openingPowers) {
@@ -154,6 +154,6 @@ export async function searchOpening(level: LevelConfig, random: () => number = M
       }
     } finally { world.dispose(); }
   }
-  if (!safePowers.length) throw new Error('未找到已结算的安全先手弹射');
+  if (!safePowers.length) throw new Error('No safe, settled Opening Flick shot was found');
   return safePowers[Math.floor(unitRandom(random) * safePowers.length)];
 }

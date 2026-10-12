@@ -152,12 +152,12 @@ export class PhysicsWorld {
     try {
       for (let i = 0; i < PHYSICS_CONFIG.initialSettleSteps; i++) {
         const events = instance.step();
-        if (events.contacts.length || events.fallenCoinIds.length) throw new Error('关卡初态产生碰撞或掉落');
+        if (events.contacts.length || events.fallenCoinIds.length) throw new Error('The initial level caused a collision or fall');
       }
-      if (!instance.allSupported() || !instance.isQuiet()) throw new Error('关卡初态没有稳定桌面支撑');
+      if (!instance.allSupported() || !instance.isQuiet()) throw new Error('The initial level contains an unsupported or unsettled coin');
       for (const coin of snapshot.coins) {
         const position = instance.coins.get(coin.id)!.body.translation();
-        if (Math.hypot(position.x - coin.x, position.z - coin.z) > PHYSICS_CONFIG.maxInitialDrift) throw new Error('关卡预稳定改变了布局');
+        if (Math.hypot(position.x - coin.x, position.z - coin.z) > PHYSICS_CONFIG.maxInitialDrift) throw new Error('Settling the initial level changed the layout');
       }
       return instance;
     } catch (error) { instance.dispose(); throw error; }
@@ -165,7 +165,7 @@ export class PhysicsWorld {
   static validate(level: LevelConfig): void { validateLevel(level); }
   /** Export only a quiet world; step() has drained both event queues at this boundary. */
   snapshot(): PhysicsSnapshot {
-    if (this.disposed || !this.isQuiet() || !this.snapshotSupported()) throw new Error('仅能导出静止且有支撑的物理世界');
+    if (this.disposed || !this.isQuiet() || !this.snapshotSupported()) throw new Error('Only a settled physics world with supported coins can be exported');
     return {
       version: PHYSICS_CONFIG.version, level: structuredClone(this.level), bytes: this.world.takeSnapshot(),
       tableHandle: this.tableCollider.handle,
@@ -178,7 +178,7 @@ export class PhysicsWorld {
   }
   static async restore(input: PhysicsSnapshot): Promise<PhysicsWorld> {
     const snapshot = structuredClone(input);
-    if (snapshot.version !== PHYSICS_CONFIG.version || !(snapshot.bytes instanceof Uint8Array) || snapshot.bytes.length === 0) throw new Error('物理快照版本或数据无效');
+    if (snapshot.version !== PHYSICS_CONFIG.version || !(snapshot.bytes instanceof Uint8Array) || snapshot.bytes.length === 0) throw new Error('Invalid physics snapshot version or data');
     if (!Array.isArray(snapshot.coins) || !Array.isArray(snapshot.obstacles) || !Array.isArray(snapshot.freshCoinIds)
       || !Array.isArray(snapshot.fallen) || !Array.isArray(snapshot.shotTargets) || !Array.isArray(snapshot.pendingImpactTargets)
       || typeof snapshot.frozen !== 'boolean' || !Number.isFinite(snapshot.tableHandle)
@@ -189,7 +189,7 @@ export class PhysicsWorld {
       || new Set(snapshot.coins.map((coin) => coin.colliderHandle)).size !== snapshot.coins.length
       || snapshot.obstacles.some((entry) => !Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string' || !Number.isFinite(entry[1]))
       || [...snapshot.freshCoinIds, ...snapshot.fallen].some((id) => !snapshot.coins.some((coin) => coin.id === id))
-      || (snapshot.shotSourceId !== null && !snapshot.coins.some((coin) => coin.id === snapshot.shotSourceId))) throw new Error('快照映射无效');
+      || (snapshot.shotSourceId !== null && !snapshot.coins.some((coin) => coin.id === snapshot.shotSourceId))) throw new Error('Invalid snapshot mapping');
     // The authored level can contain removed coins; actual bodies and moved poses
     // are restored exclusively from Rapier, never recreated from these configs.
     validateLevel(snapshot.level, new Set(snapshot.level.coins.map((coin) => coin.id)), new Set(snapshot.level.obstacles.map((obstacle) => obstacle.id)));
@@ -197,12 +197,12 @@ export class PhysicsWorld {
     await initialization;
     const instance = new PhysicsWorld(snapshot.level, snapshot);
     try {
-      if (!instance.tableCollider?.isValid()) throw new Error('快照映射无效');
+      if (!instance.tableCollider?.isValid()) throw new Error('Invalid snapshot mapping');
       for (const coin of instance.coins.values()) {
-        if (!coin.body?.isValid() || !coin.collider?.isValid() || coin.collider.parent()?.handle !== coin.body.handle) throw new Error('快照硬币映射无效');
+        if (!coin.body?.isValid() || !coin.collider?.isValid() || coin.collider.parent()?.handle !== coin.body.handle) throw new Error('Invalid snapshot coin mapping');
       }
-      for (const handle of instance.obstacleHandles) if (!instance.world.getCollider(handle)?.isValid()) throw new Error('快照障碍映射无效');
-      if (!instance.isQuiet() || !instance.snapshotSupported()) throw new Error('快照不是静止且有支撑的物理世界');
+      for (const handle of instance.obstacleHandles) if (!instance.world.getCollider(handle)?.isValid()) throw new Error('Invalid snapshot obstacle mapping');
+      if (!instance.isQuiet() || !instance.snapshotSupported()) throw new Error('The snapshot contains an unsettled physics world or unsupported coins');
       return instance;
     } catch (error) { instance.dispose(); throw error; }
   }
@@ -295,7 +295,7 @@ export class PhysicsWorld {
     const fallenCoinIds: string[] = [];
     for (const [id, coin] of this.coins) {
       const position = coin.body.translation(), rotation = coin.body.rotation();
-      if (![position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, rotation.w].every(Number.isFinite)) throw new Error('物理世界出现非有限位姿');
+      if (![position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, rotation.w].every(Number.isFinite)) throw new Error('The physics world contains a non-finite position or rotation');
       if (position.y < PHYSICS_CONFIG.fallY && !this.fallen.has(id)) { this.fallen.add(id); fallenCoinIds.push(id); }
       const onTable = this.supported(coin);
       // A rim overhang is stable while the centre of mass remains on the table.

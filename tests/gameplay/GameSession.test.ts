@@ -350,6 +350,6 @@ describe('production physics and session lifecycle', () => {
     game.shoot({ x: 0, z: 1 }, 0.1);
     for (let i = 0; i < PHYSICS_CONFIG.maxShotSteps; i++) game.tick(PHYSICS_CONFIG.fixedDt);
     expect(game.view).toMatchObject({ phase: 'error', scores: [0, 0], remaining: 2, currentPlayer: 0 });
-    expect(game.view.error).toContain('支撑'); expect(game.shoot({ x: 1, z: 0 }, 0.5)).toBe(false);
+    expect(game.view.error).toContain('unsupported coin'); expect(game.shoot({ x: 1, z: 0 }, 0.5)).toBe(false);
   });
 });

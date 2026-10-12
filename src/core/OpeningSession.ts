@@ -29,8 +29,8 @@ export class OpeningSession {
     };
   }
   static async create(input: LevelConfig, variant: BattleVariant): Promise<OpeningSession> {
-    if (variant !== 'pvp' && variant !== 'pve') throw new Error('无效对战类型');
-    if (input.purpose !== 'opening') throw new Error('先手会话必须使用先手专用关卡');
+    if (variant !== 'pvp' && variant !== 'pve') throw new Error('Invalid Battle variant');
+    if (input.purpose !== 'opening') throw new Error('Opening Flick requires a dedicated opening level');
     PhysicsWorld.validate(input);
     const level = structuredClone(input);
     level.coins[0].x = START.x; level.coins[0].z = START.z;
@@ -129,6 +129,6 @@ export class OpeningSession {
     if (this.disposed) return;
     this.disposed = true; this.generation++; this.physics.dispose(); this.feedback = []; this.accumulator = 0;
     this.state.phase = 'error'; this.state.activeCoinId = null; this.state.remaining = 0;
-    this.state.error = '会话已销毁'; this.state.revision++;
+    this.state.error = 'The opening session has been disposed'; this.state.revision++;
   }
 }

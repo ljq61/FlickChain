@@ -156,8 +156,8 @@ describe('real Rapier 3D world', () => {
     } finally { world.dispose(); }
   });
   it('rejects overlapping, invalid and dangerous initial layouts', async () => {
-    await expect(PhysicsWorld.create(level([['A', 0, 0], ['B', 0.02, 0]]))).rejects.toThrow(/重叠|相交/);
-    await expect(PhysicsWorld.create(level([['A', 0.58, 0], ['B', 0, 0]]))).rejects.toThrow(/桌边|贴边/);
+    await expect(PhysicsWorld.create(level([['A', 0, 0], ['B', 0.02, 0]]))).rejects.toThrow(/overlap/);
+    await expect(PhysicsWorld.create(level([['A', 0.58, 0], ['B', 0, 0]]))).rejects.toThrow(/table edge/);
     await expect(PhysicsWorld.create(level([['A', NaN, 0], ['B', 0, 0]]))).rejects.toThrow();
   });
   it('restores a stacked settled world with support flags and exactly replays the next production shot', async () => {

@@ -44,11 +44,11 @@ describe('exact settled production snapshot replay', () => {
   it('refuses export during a shot, pause and disposal, and rejects an inconsistent clone state', async () => {
     const game = await create(); const snapshot = game.exportSnapshot();
     const invalid = structuredClone(snapshot); invalid.view.phase = 'ready'; invalid.view.activeCoinId = 'missing';
-    await expect(GameSession.restore(invalid)).rejects.toThrow('映射');
+    await expect(GameSession.restore(invalid)).rejects.toThrow('mapping');
     game.selectCoin('A'); game.shoot({ x: 1, z: 0 }, .42);
-    expect(() => game.exportSnapshot()).toThrow('静止');
-    game.pause(); expect(() => game.exportSnapshot()).toThrow('静止');
-    game.resume(); finish(game); game.dispose(); expect(() => game.exportSnapshot()).toThrow('静止');
+    expect(() => game.exportSnapshot()).toThrow('settled');
+    game.pause(); expect(() => game.exportSnapshot()).toThrow('settled');
+    game.resume(); finish(game); game.dispose(); expect(() => game.exportSnapshot()).toThrow('settled');
   });
   it('restores a ten-point match above five and preserves the target throughout a real shot', async () => {
     const game = await GameSession.create(level(), 'battle', 1, 10); sessions.push(game);
@@ -64,10 +64,10 @@ describe('exact settled production snapshot replay', () => {
     expect(clone.view.battleWinScore).toBe(10);
     for (const goal of [0, 5, 6, null, NaN]) {
       const invalid = game.exportSnapshot(); Object.assign(invalid.view, { battleWinScore: goal });
-      await expect(GameSession.restore(invalid)).rejects.toThrow('状态无效');
+      await expect(GameSession.restore(invalid)).rejects.toThrow('Invalid game snapshot state');
     }
     const winning = game.exportSnapshot(); winning.view.scores[1] = 10;
-    await expect(GameSession.restore(winning)).rejects.toThrow('状态无效');
+    await expect(GameSession.restore(winning)).rejects.toThrow('Invalid game snapshot state');
   });
   it('restores an edge-overhanging retained coin after a valid Battle refill without revalidating it as a fresh spawn', async () => {
     const layout = level(); layout.coins = [{ id: 'A', x: .5, z: 0, materialId: 'standard' }, { id: 'B', x: -.5, z: .3, materialId: 'standard' }];

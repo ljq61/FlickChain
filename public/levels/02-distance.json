@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "id": "distance",
-  "name": "02 · 远近有度",
-  "lesson": "拖得更远，力度更大。碰到目标即可，留意桌边。",
+  "name": "02 · Distance Control",
+  "lesson": "Hold the finger longer for more power. Hit the target coin and watch the table edge.",
   "table": { "shape": "circle", "width": 1.6, "depth": 1.6, "materialId": "wood" },
   "coins": [
     { "id": "a", "x": 0, "z": 0.32, "materialId": "standard" },

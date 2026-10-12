@@ -18,7 +18,7 @@ type Point = { x: number; z: number };
 
 function unit(random: () => number): number {
   const value = random();
-  if (!Number.isFinite(value)) throw new Error('关卡随机数必须为有限数字');
+  if (!Number.isFinite(value)) throw new Error('Level random value must be a finite number');
   return Math.max(0, Math.min(1 - Number.EPSILON, value));
 }
 function integer(min: number, max: number, random: () => number): number {
@@ -46,17 +46,17 @@ function place(randomPoint: () => Point, accepts: (point: Point) => boolean, rad
     const point = polar(radius, angle * Math.PI / 36);
     if (accepts(point)) return point;
   }
-  throw new Error('桌面没有足够的安全位置生成指定数量的硬币或玻璃杯');
+  throw new Error('Table has insufficient safe positions for the requested coins or glass cups');
 }
 function retainedCoins(retained: CoinTransform[], table: TableConfig): CoinConfig[] {
   const ids = new Set<string>();
   return retained.map((coin) => {
-    if (!coin.id || ids.has(coin.id)) throw new Error('存活硬币 ID 为空或重复');
+    if (!coin.id || ids.has(coin.id)) throw new Error('Surviving coin ID is empty or duplicate');
     ids.add(coin.id);
-    if (coin.materialId !== 'standard' && coin.materialId !== 'iron') throw new Error('未知存活硬币材质');
+    if (coin.materialId !== 'standard' && coin.materialId !== 'iron') throw new Error('Unknown surviving coin material');
     const { x, z } = coin.position;
     if (!Number.isFinite(x) || !Number.isFinite(z) || tableClearance(table, x, z) <= 0) {
-      throw new Error('存活硬币中心必须在桌面内');
+      throw new Error('Surviving coin centre must be inside the table');
     }
     return { id: coin.id, x, z, materialId: coin.materialId };
   });
@@ -73,7 +73,7 @@ function idFactory(reserved: Iterable<string>, prefix: string): (kind: string) =
 }
 function addCoins(table: TableConfig, retained: CoinConfig[], obstacles: ObstacleConfig[], materials: CoinMaterialId[],
   random: () => number, id: (kind: string) => string, edgeCount = 0, clearPath?: [CoinConfig, CoinConfig], openingSource?: CoinConfig): CoinConfig[] {
-  if (retained.length + materials.length > PHYSICS_CONFIG.maxCoins) throw new Error('关卡硬币数量超过支持上限');
+  if (retained.length + materials.length > PHYSICS_CONFIG.maxCoins) throw new Error('Level coin count exceeds the supported limit');
   const coins = retained.map((coin) => ({ ...coin }));
   const tableRadius = Math.min(table.width, table.depth) / 2;
   const fallbackRadii = Array.from({ length: 14 }, (_, i) => i * tableRadius / 15);
@@ -99,8 +99,8 @@ function addCoins(table: TableConfig, retained: CoinConfig[], obstacles: Obstacl
 
 /** Round counts are additions: a carried survivor is extra. Coordinates and dimensions use metres. */
 export function generateRound(round: number, retained: CoinTransform[] = [], random: () => number = Math.random): LevelConfig {
-  if (!Number.isSafeInteger(round) || round < 1) throw new Error('轮次必须是正整数');
-  if (retained.length > 1 || (round === 1 && retained.length)) throw new Error('新轮次只能保留上一轮唯一存活硬币');
+  if (!Number.isSafeInteger(round) || round < 1) throw new Error('Round must be a positive integer');
+  if (retained.length > 1 || (round === 1 && retained.length)) throw new Error('A new round can retain only the sole surviving coin from the previous round');
   const prefix = `campaign-${++generation}-round-${round}`;
   const table: TableConfig = { shape: 'circle', width: 1.6, depth: 1.6,
     materialId: round < 5 ? 'wood' : round < 7 ? 'marble' : unit(random) < 0.5 ? 'wood' : 'marble' };
@@ -130,18 +130,18 @@ export function generateRound(round: number, retained: CoinTransform[] = [], ran
   }
   const coins = addCoins(table, opening, obstacles, carry.length ? materials.slice(1) : materials,
     random, id, round === 2 ? 1 : 0, clearPath);
-  return { schemaVersion: 1, id: prefix, name: `第 ${round} 轮`, lesson: '从存活硬币继续，逐枚接力清空桌面',
+  return { schemaVersion: 1, id: prefix, name: `Round ${round}`, lesson: 'Continue with the surviving coin and clear the table one coin at a time.',
     table, coins, activeCoinId: carry[0]?.id ?? coins[0].id, obstacles };
 }
 
 /** Revival preserves the settled board and replaces precisely the fallen count with gold coins. */
 export function generateRevival(level: LevelConfig, retained: CoinTransform[], fallenCount: number,
   random: () => number = Math.random): LevelConfig {
-  if (!Number.isSafeInteger(fallenCount) || fallenCount < 0) throw new Error('补币数量必须是非负整数');
-  if (retained.length + fallenCount > PHYSICS_CONFIG.maxCoins) throw new Error('关卡硬币数量超过支持上限');
+  if (!Number.isSafeInteger(fallenCount) || fallenCount < 0) throw new Error('Refill count must be a nonnegative integer');
+  if (retained.length + fallenCount > PHYSICS_CONFIG.maxCoins) throw new Error('Level coin count exceeds the supported limit');
   const table = { ...level.table };
   const carry = retainedCoins(retained, table);
-  if (carry.length + fallenCount < 2) throw new Error('复活后至少需要两枚硬币');
+  if (carry.length + fallenCount < 2) throw new Error('Revival requires at least two coins');
   const obstacles = level.obstacles.map((obstacle) => ({ ...obstacle }));
   const prefix = `campaign-${++generation}-revival`;
   const id = idFactory([...level.coins.map((coin) => coin.id), ...carry.map((coin) => coin.id), ...obstacles.map((obstacle) => obstacle.id)], prefix);

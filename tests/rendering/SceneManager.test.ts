@@ -154,7 +154,7 @@ describe('campaign scene resource continuity', () => {
     expect(meter.hidden).toBe(true);
     scene.render(authoritative, ready, aim);
     expect(meter.hidden).toBe(false);
-    expect(meter.getAttribute('aria-label')).toBe('弹射蓄力');
+    expect(meter.getAttribute('aria-label')).toBe('Flick power');
     expect(meter.hasAttribute('aria-live')).toBe(false);
     expect(meter.getAttribute('aria-valuenow')).toBe('25');
     expect(fill.style.clipPath).toBe('inset(75% 0 0)');

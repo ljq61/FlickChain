@@ -201,17 +201,17 @@ describe('continuous campaign generation', () => {
   });
 
   it('rejects malformed round/count/RNG/retention inputs without unbounded work', () => {
-    for (const round of [0, -1, 1.5, NaN, Infinity]) expect(() => generateRound(round)).toThrow(/轮次/);
+    for (const round of [0, -1, 1.5, NaN, Infinity]) expect(() => generateRound(round)).toThrow(/Round/);
     const level = generateRound(1, [], seeded(1));
-    for (const count of [-1, 0.5, NaN, Infinity]) expect(() => generateRevival(level, [], count)).toThrow(/补币/);
-    expect(() => generateRevival(level, [], Number.MAX_SAFE_INTEGER)).toThrow(/上限/);
-    expect(() => generateRevival(level, [], 1)).toThrow(/至少需要/);
-    expect(() => generateRound(1, [], () => NaN)).toThrow(/随机数/);
+    for (const count of [-1, 0.5, NaN, Infinity]) expect(() => generateRevival(level, [], count)).toThrow(/Refill count/);
+    expect(() => generateRevival(level, [], Number.MAX_SAFE_INTEGER)).toThrow(/supported limit/);
+    expect(() => generateRevival(level, [], 1)).toThrow(/requires at least/);
+    expect(() => generateRound(1, [], () => NaN)).toThrow(/random value/);
     const carry = transform({ id: 'carry', x: 0.8, z: 0, materialId: 'standard' });
-    expect(() => generateRound(2, [carry])).toThrow(/中心/);
+    expect(() => generateRound(2, [carry])).toThrow(/centre/);
     carry.position.x = 0;
-    expect(() => generateRound(1, [carry])).toThrow(/唯一存活/);
-    expect(() => generateRound(2, [carry, carry])).toThrow(/唯一存活/);
-    expect(() => generateRevival(level, [carry, carry], 0)).toThrow(/重复/);
+    expect(() => generateRound(1, [carry])).toThrow(/sole surviving/);
+    expect(() => generateRound(2, [carry, carry])).toThrow(/sole surviving/);
+    expect(() => generateRevival(level, [carry, carry], 0)).toThrow(/duplicate/);
   });
 });

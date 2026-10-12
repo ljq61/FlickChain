@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "id": "first-flick",
-  "name": "01 · 初次接力",
-  "lesson": "点选起手币，首杆前可换币；按住手指蓄力，松手弹射。",
+  "name": "01 · First Relay",
+  "lesson": "Select a starting coin; you can switch before your first shot. Hold the finger to charge, then release to flick.",
   "table": { "shape": "circle", "width": 1.6, "depth": 1.6, "materialId": "wood" },
   "coins": [
     { "id": "a", "x": -0.2, "z": 0.1, "materialId": "standard" },

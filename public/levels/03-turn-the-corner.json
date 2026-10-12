@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "id": "turn-the-corner",
-  "name": "03 · 转角接棒",
-  "lesson": "每杆只碰一枚币；从目标停下的位置，调整方向继续。",
+  "name": "03 · Around the Corner",
+  "lesson": "Hit only one target coin per shot. Continue from where it stops and adjust your aim.",
   "table": { "shape": "circle", "width": 1.6, "depth": 1.6, "materialId": "wood" },
   "coins": [
     { "id": "a", "x": -0.3, "z": 0.28, "materialId": "standard" },

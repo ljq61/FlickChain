@@ -54,8 +54,8 @@ describe('configured settled point goal wins Battle', () => {
     }
   });
   it('rejects an invalid winning score before creating physics', async () => {
-    await expect(GameSession.create(level(), 'battle', 0, 6 as BattleWinScore)).rejects.toThrow('目标分数');
-    await expect(GameSession.create(level(), 'battle', 0, 5 as BattleWinScore)).rejects.toThrow('目标分数');
+    await expect(GameSession.create(level(), 'battle', 0, 6 as BattleWinScore)).rejects.toThrow('target score');
+    await expect(GameSession.create(level(), 'battle', 0, 5 as BattleWinScore)).rejects.toThrow('target score');
   });
   it('a fall swaps the player before a refill and lets them freely choose a new public coin', async () => {
     const layout = level(); layout.coins[0].x = 1.08;

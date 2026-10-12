@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "id": "full-chain",
-  "name": "05 · 一弹到底",
-  "lesson": "连续四次合法接力。看清整张桌面，每杆都只碰一枚目标。",
+  "name": "05 · Full Chain",
+  "lesson": "Make four valid relays in a row. Plan across the whole table and hit only one target per shot.",
   "table": { "shape": "circle", "width": 1.6, "depth": 1.6, "materialId": "wood" },
   "coins": [
     { "id": "a", "x": -0.32, "z": 0.5, "materialId": "standard" },
