@@ -79,7 +79,9 @@ export class PointerInput {
     canvas.addEventListener('lostpointercapture', (event) => {
       if (event.pointerId === this.gesture?.pointerId) this.cancel();
     }, { signal });
-    canvas.addEventListener('contextmenu', (event) => { event.preventDefault(); this.cancel(); }, { signal });
+    // Some mobile browsers dispatch this during an ordinary charge hold.
+    // Suppress the menu without treating it as a cancelled game gesture.
+    canvas.addEventListener('contextmenu', (event) => event.preventDefault(), { signal });
     window.addEventListener('blur', () => { this.cancel(); this.pointers.clear(); }, { signal });
     window.addEventListener('resize', () => this.cancel(), { signal });
     document.addEventListener('visibilitychange', () => {

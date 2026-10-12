@@ -5,6 +5,7 @@ import { OpeningSession } from '../core/OpeningSession';
 import { AIClient, type AiShot } from '../ai/AIClient';
 import { GameSession } from '../core/GameSession';
 import { PointerInput, chargePower } from '../input/PointerInput';
+import { BrowserGestureGuard } from '../input/BrowserGestureGuard';
 import { SaveAdapter, type SaveData } from '../platform/SaveAdapter';
 import { SceneManager } from '../rendering/SceneManager';
 import { Shell } from '../ui/Shell';
@@ -39,6 +40,7 @@ export class GameApp {
   private readonly shell: Shell;
   private readonly scene: SceneManager;
   private readonly pointer: PointerInput;
+  private readonly browserGestures: BrowserGestureGuard;
   private session: GameSession | null = null;
   private opening: OpeningSession | null = null;
   private battle: BattleRun | null = null;
@@ -93,6 +95,7 @@ export class GameApp {
       pickCoin: id => this.pickCoin(id),
       chargeFailed: () => this.sound.play('charge-failed'),
     });
+    this.browserGestures = new BrowserGestureGuard(root);
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('pagehide', this.onPageHide);
     this.renderShell();
@@ -541,6 +544,7 @@ export class GameApp {
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('pagehide', this.onPageHide);
     this.pointer.dispose();
+    this.browserGestures.dispose();
     this.session?.dispose();
     this.opening?.dispose();
     this.ai.dispose();
