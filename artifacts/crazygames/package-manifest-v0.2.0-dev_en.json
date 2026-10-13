@@ -1,0 +1,101 @@
+{
+  "created": "2026-10-13T13:10:35.9072546Z",
+  "version": "0.2.0",
+  "branch": "dev_en",
+  "sourceRevision": "aa6ba136fb3dbeaf02f4947fd52373c9f8017f28",
+  "sourceDirty": false,
+  "builtAt": "2026-10-13T13:09:55.312Z",
+  "source": "clean committed source build",
+  "archive": "FlickChain-v0.2.0-dev_en.zip",
+  "archiveBytes": 3704384,
+  "archiveSha256": "2a38c5d833b8a299cae64a8d93328ce49a00193707999b2db50aaf7ddf8e4993",
+  "expandedBytes": 7239832.0,
+  "fileCount": 17,
+  "files": [
+    {
+      "path": "assets/BattleWorker-BpGUIj5-.js",
+      "bytes": 2270524,
+      "sha256": "9d319ef4a49248461f6c293f5b8e1e5e0c11d4cd8805ab3b27ef4ac6fc5f2fc5"
+    },
+    {
+      "path": "assets/index-D295Ax1x.css",
+      "bytes": 22319,
+      "sha256": "e0f744a629c62b27f717381f2a6b7f45c4267030c1d89250a583f1cb037f5d5e"
+    },
+    {
+      "path": "assets/index-DKDBeG84.js",
+      "bytes": 2975303,
+      "sha256": "330f48e88a45c749582427cff32f6d7bc386a54de4ab7eb8f64b7fc3323a3280"
+    },
+    {
+      "path": "audio/coin-hit-a.wav",
+      "bytes": 20330,
+      "sha256": "fe8b8206b8b765f9c4fe70c2db5f467ec0b1f537440683a1db8d094bda64959c"
+    },
+    {
+      "path": "audio/coin-hit-b.wav",
+      "bytes": 20330,
+      "sha256": "cce6f1b8e99dae934015e13387bcd62ba1005087b3e093f4d36b4108e77c6828"
+    },
+    {
+      "path": "audio/coin-land.wav",
+      "bytes": 52082,
+      "sha256": "5ec416275ca59f42870d5fc9ec80b059f141bfd8dcc69990c1cab5c5c4c52592"
+    },
+    {
+      "path": "audio/coin-wood.wav",
+      "bytes": 9746,
+      "sha256": "3f723e20d45dc660cf8677e155f805419a9edebddec885e12aa1862ed2ed4156"
+    },
+    {
+      "path": "audio/midnight-jazz.mp3",
+      "bytes": 466277,
+      "sha256": "8e1be43fea4611b7ad499da9cc9cc2406c07ae4819efab39a820ae385a493712"
+    },
+    {
+      "path": "branding/flickchain-logo.png",
+      "bytes": 1292898,
+      "sha256": "33ab75705b78651acbf066285baa11f28f358b76e92956b2b1d0ceb05d6e5c00"
+    },
+    {
+      "path": "index.html",
+      "bytes": 615,
+      "sha256": "a4db60f7bad3e1bd545d55861fb615d55841459efd24033d76261c759f5d067d"
+    },
+    {
+      "path": "levels/01-first-flick.json",
+      "bytes": 495,
+      "sha256": "5d778e802c8966d4c9f81388a9de1bf1abb2f50512256c3d6090277d4eb66ff1"
+    },
+    {
+      "path": "levels/02-distance.json",
+      "bytes": 466,
+      "sha256": "f6b39b6712c985265c6f83e098a885ac1e7c44ed55e8077e6fd8656bf7e11d85"
+    },
+    {
+      "path": "levels/03-turn-the-corner.json",
+      "bytes": 549,
+      "sha256": "f90aa64125a29f1c3efd58920e4026290fc15af3f06e875ccb30888457345388"
+    },
+    {
+      "path": "levels/04-zigzag.json",
+      "bytes": 611,
+      "sha256": "50351dbe077639a6198fa0a6f5ea1fb1e44b43f772b7bf92ee39f6bea47678c7"
+    },
+    {
+      "path": "levels/05-full-chain.json",
+      "bytes": 685,
+      "sha256": "1ccf4af69798b2949ed9d619dcf9b49730b167cee7ab0ef7deca481e69ff6c7b"
+    },
+    {
+      "path": "models/flick-hand.glb",
+      "bytes": 106380,
+      "sha256": "a5d027e6381b2c3ca303b06a86d249f42e06c3a619b1d707ed0f2cb5d6f7b028"
+    },
+    {
+      "path": "version.json",
+      "bytes": 222,
+      "sha256": "0083d7602ee87413617eb91ecf80e27dbe03684dc2bbf9dd67ac1b707a1bbb90"
+    }
+  ]
+}

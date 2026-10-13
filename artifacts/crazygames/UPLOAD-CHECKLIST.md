@@ -1,12 +1,14 @@
-# FlickChain — CrazyGames Basic Launch preparation — 2026-10-13
+# FlickChain 0.2.0 — CrazyGames Basic Launch preparation — 2026-10-13
 
 Status: local game build, English copy and SDK integration verified. The game has not been uploaded to the Developer Portal, tested in CrazyGames Preview, approved, or published. This is a Basic Launch preparation package; it does not claim Full Launch readiness.
 
 ## Game upload
 
-- Use `FlickChain-dev-en-2026-10-13.zip`, replacing the older 2026-10-12 ZIP.
+- Use `FlickChain-v0.2.0-dev_en.zip`. Both date-only ZIPs are historical candidates and omit the latest computer-charge/turn feedback and opening-rim fix.
 - `index.html` is at the archive root; bundled resources use relative paths. Worker, WASM-containing bundles, hand model, branding, levels and audio are included.
-- `package-manifest-2026-10-13.json` records byte counts and SHA-256 hashes. It identifies the release-candidate working tree and its baseline; the delivery source is versioned on `dev_en`.
+- `package-manifest-v0.2.0-dev_en.json` records version, build time, branch, source revision/change status, byte counts and SHA-256 hashes. `version.json` inside the game ZIP provides the build identity.
+- Current candidate: 17 files, 7,239,832 expanded bytes, 3,704,384 archive bytes; archive SHA-256 `2a38c5d833b8a299cae64a8d93328ce49a00193707999b2db50aaf7ddf8e4993`. Package/lock/build versions match and every archived file was verified against `dist/` by SHA-256.
+- This ZIP was rebuilt from committed source `aa6ba136fb3dbeaf02f4947fd52373c9f8017f28`, with `sourceDirty: false`. Build time and source identity are recorded in the manifest and bundled `version.json`; this replaces the earlier working-tree 0.2.0 candidate. It remains a Basic Launch submission candidate, not an approved platform release.
 - Game code loads the official SDK v3 from `https://sdk.crazygames.com/crazygames-sdk-v3.js`. The SDK is hosted externally by CrazyGames and is not copied into the archive.
 - No advertisements, account integration, leaderboard or SDK data APIs are called by game code. Basic Launch forbids advertisements. Progress currently uses local browser storage.
 - Use `submission-copy-en.md` for a reviewable English description and controls.
