@@ -1,27 +1,64 @@
-# FlickChain《一弹到底》
+# FlickChain
 
-手机优先的 Web 3D 物理接力游戏。所有硬币公共共享：一杆合法命中唯一目标后获得 1 分，原币在结算后消失，玩家从目标币的最终位置继续弹射。
+A mobile-first 3D coin-flicking game set on a cozy tavern tabletop.
 
-[在线游玩](https://ljq61.github.io/FlickChain/) · [开发进度与验证记录](docs/PROGRESS.md)
+**Current game version: 0.2.0 — release candidate.** This checkout is the English distribution on `dev_en`. English content and CrazyGames integration belong to this branch; `main` and `dev_cn` retain Chinese content and share the gameplay fixes and general art improvements.
 
-当前状态（2026-10-13）：`dev_en` 为英文发行分支；昏暗酒馆、可见发光灯泡、聚光圆桌与厚底威士忌杯已完成。单人连续随机闯关和本地 PVP/PVE 均可玩，双方先得 10 分获胜；PVE 默认采用更轻松的电脑策略。CrazyGames SDK v3 已接入加载与游戏生命周期，英文上传包、提交文案及三种封面尺寸已准备。
+[Changelog](CHANGELOG.md) · [Development and validation](docs/PROGRESS.md) · [CrazyGames upload checklist](artifacts/crazygames/UPLOAD-CHECKLIST.md)
 
-- 单人每轮继承最后存活币的真实位置，新币避让后轻落桌；整次闯关有 3 次复活，保留残局与累计分，掉落则补回同数量金币，本地记录最高分。
-- 对战先弹金币比远争先，再在随机木/大理石桌、9 枚混合硬币与 1–5 个酒杯的棋盘上接力，失误换手。
-- 最近完整自动化回归 383 项通过、1 项可选测试跳过；类型检查、生产构建、桌面与手机尺寸浏览器及 CrazyGames 本地 SDK 生命周期实测见 [开发进度](docs/PROGRESS.md)。
+The [public GitHub Pages game](https://ljq61.github.io/FlickChain/) is built from `main` and currently serves the Chinese edition. CrazyGames Preview and publication have not been completed.
 
-随机轮配方、继承/复活、材质与旧固定布局解法分别回归，不承诺所有随机布局完整可解。真实手机触摸与性能、CrazyGames Developer Portal Preview 和正式发布尚未验收；平台排行榜和广告复活未接入。
+## Game description
 
-## 本地运行
+Flick coins, build a chain, and keep your streak alive on a cozy 3D tabletop.
 
-需要 Node.js 20.19+ 或 22.12+。
+Line up your shot, charge your flick, and hit exactly one other coin directly. Score a point, then take your next shot from the coin you just hit. All coins are shared. Other coins can knock into each other, but a miss, a direct hit on multiple coins, or any coin falling off the table breaks the chain. Rebounds from the table's obstacles are allowed.
+
+Play solo to beat your best score, with three continues to keep your run going. Each completed round brings more coins to the table. Play against a friend on the same device or challenge the computer in a race to 10 points. Before a match, each player takes an opening shot: the longest valid shot that comes to rest on the table goes first.
+
+### Solo Play
+
+- Clear each round by chaining through its coins. Your last coin carries over at its actual resting position.
+- A miss or foul ends the current attempt. Use one of three continues to keep your score and remaining coins; fallen coins are replaced when continuing.
+- Restart begins a fresh run. Your local best score remains saved when browser storage is available.
+
+### Local Battle
+
+- Choose **2 Players** for one shared device or **Vs. Computer** for a computer opponent. This is local play, not online multiplayer.
+- Both opening shots use the same starting position, direction and tabletop material. A fall or timeout forfeits that shot; tied results or two forfeits trigger another opening contest.
+- A stationary coin partly overhanging the rim still counts when it has real tabletop support. Distance is measured to its resting position.
+- The match uses a random wood or marble table, nine mixed gold/iron coins and one to five glasses. A legal relay scores +1 and keeps your turn; a miss or foul switches players after settlement. First to 10 wins.
+- Below the winning score, a board with zero or one surviving coin keeps its score, table and obstacles. **2 Players** refills to nine coins; **Vs. Computer** adds eight new coins.
+- The computer uses the same production physics, with a more forgiving aim and power strategy. Its hand and power meter show the charge before each shot. A brief central banner announces the current player's turn.
+
+## Controls
+
+| Action | Mouse / touch |
+| --- | --- |
+| Choose a starting coin | Click or tap any coin after the coins settle. Before firing, you can choose another starting coin. |
+| Aim | Drag empty tabletop space to rotate the view and line up your shot. Opening shots always point straight ahead. |
+| Charge and flick | Press and hold the hand or active coin, then release. Hold longer for more power; the meter fills green → yellow → red. |
+| Full power | Reached after 1.25 seconds. Release within the following two seconds, or the charge is canceled; release and press again to retry. |
+| Continue a successful chain | Play from the coin you just hit, at its final position. You cannot switch to another coin during that chain. |
+| Pause / resume / restart / menu | Select the gear button, then the corresponding action. |
+| Sound | Select the speaker button. CrazyGames can also mute the game. Audio starts after user interaction. |
+
+Wait for each shot to settle before the next action. During the computer's turn, human shot input is locked; pause and menu controls remain available. Reduced-motion preferences disable hand tremble and coin-arrival animation.
+
+## Run and build
+
+Use Node.js 20.19+ or 22.12+.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-打开终端显示的本地地址。开局硬币依次轻落桌，落稳后开放选币。空白区域拖动旋转 3D 视角；单人首轮、复活或对战换人后可选择任意公共硬币，首杆发射前可反复切换。合法命中后，必须从刚击中硬币的最终位置继续，不能重新选币。选币后镜头推近当前币，手放在金币正后方，食指待机平行桌面；按住手或当前币蓄力时食指逐渐弯曲、指尖回收，高蓄力时手会轻微抖动，松手沿当前视角前方弹射；力度只由按住时长决定，1.25秒蓄满；蓄力时手左侧显示从下向上填充的绿→黄→红竖条；满档继续按住2秒会取消蓄力并提示失败，需要松手后重新按住。减少动态效果设置会关闭抖动和入场落桌动画。近景中可通过旋转视角寻找其它硬币。一杆的目标只统计源币直接接触的硬币，对战犯规停稳后换人，换人后重新开放起手选币。
+Open the address printed by Vite. To test on a phone connected to the same network:
+
+```sh
+npm run dev -- --host 0.0.0.0
+```
 
 ```sh
 npm test
@@ -30,60 +67,54 @@ npm run build
 npm run preview
 ```
 
-`dist/` 是静态产物；资源采用相对基址。音频由用户操作解锁，存档失败仅提示，仍可游玩。随机内容用配方、几何与生产初稳回归；旧固定布局或物理参数改变须重新生成完整解，步骤见 [关卡测试说明](tests/levels/README.md)。
+`dist/` is the static game build. Upload its contents, with `index.html` at the archive root. Assets use relative paths; the AI Worker and bundled Rapier WASM are included. The build also emits `dist/version.json`.
 
-## 连续闯关配方
+## Version management
 
-| 轮次 | 桌面 | 新增硬币 | 玻璃杯 |
-|---|---|---|---|
-| 1 | 木 | 4 金币 | 0 |
-| 2 | 木 | 6 金币，至少 1 枚新增金币靠边 | 0 |
-| 3 | 木 | 6 金币 | 2 |
-| 4 | 木 | 7，其中 2 铁币 | 0 |
-| 5 | 大理石 | 7，其中 2 铁币 | 0 |
-| 6 | 大理石 | 7，金/铁随机 | 3 |
-| 7 起 | 木/大理石随机 | 5–9，金/铁随机 | 3–6 |
+- **One source of truth:** `package.json.version`; the lockfile root and package entry must match.
+- **Patch:** fixes and compatible polish. **Minor:** new features. **Major:** incompatible public/game behavior changes.
+- Before preparing a new candidate, update the version and add its changes to [CHANGELOG.md](CHANGELOG.md). The game version is independent of save, level and physics compatibility versions; do not bump those automatically.
 
-新增数量不包含上一轮幸存币。新增币与幸存币中心至少相距16 cm，继承币附近留一个20–55 cm内的目标与直达走廊。每轮旧杯抬起挪走后重新摆桌，过渡可暂停。重新开始从随机第一轮开始、分数归零，最高分保留。细则见 [PRD](docs/PRD.md)。
+```sh
+npm version patch --no-git-tag-version
+# Use minor or major instead when appropriate.
+npm run build
+```
 
-## 本地对战
+`version.json` records the game version, Git branch/revision, UTC build time and whether build inputs differ from the recorded commit. `sourceDirty: true` identifies a working-tree candidate; missing Git metadata is represented by `null`, not a fabricated revision. It does not indicate platform approval. Local tool configuration and documentation-only changes are excluded from the build-input change check.
 
-“本地对战”先选择PVP或PVE。每局木/大理石桌随机，1–5个威士忌杯和9枚随机金币/铁币。双方先在同材质空桌底侧交替向前弹金币，以停稳后的距离决定先手；掉落弃权，同距或双方掉落重比。正式棋盘合法接力+1并继续，失误换手，PVP/PVE先得10分胜利。未到目标分且只剩0–1币时，保留残局、比分和杯；PVP补足9币，PVE每次随机新增8枚金币/铁币继续。
+Use versioned upload filenames such as `FlickChain-v0.2.0-dev_en.zip`, paired with a SHA-256 manifest. Earlier ZIPs remain historical candidates. On Windows, package the completed build with:
 
-PVE默认为更轻松的电脑对手：使用Worker复制生产Rapier快照，有限试算后加入角度与力度误差；连得2分后更容易失准，失误时按正常规则交给玩家。命中和换手仍由真实物理判定，不强制限制每回合得分。比远也采用安全的中等力度，不追求每次最远。用户在电脑回合不能操作棋盘；暂停、后台、重开与菜单取消旧试算。目前没有难度选择界面，三档难度与真实手机耗时尚待调校。
+```powershell
+$gameVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+Compress-Archive -Path dist/* -DestinationPath "artifacts/crazygames/FlickChain-v$gameVersion-dev_en.zip" -Force
+```
 
-## 模型、物理与音效
+Commit the source changes and version metadata before tagging a finalized release. Rebuild from that commit and verify the manifest before uploading. Platform submission and publication are separate from local builds and Git pushes.
 
-手模型以用户调整的 [pointing-hand-rigged.blend](blender/pointing-hand-rigged.blend) 为编辑源，[flick-hand.blend](assets/flick-hand.blend) 为游戏适配副本，[flick-hand.glb](public/models/flick-hand.glb) 为运行资产。导出保留用户骨骼和蒙皮，将 `Index_Curl` 的12–36帧映射为一秒 `FlickCharge`，运行时按蓄力比例采样。袖口开口与原模型拓扑保留，旧封闭连体手属于历史版本。加载失败可用“重建本局”重试。重导方法和资产指纹见 [模型说明](assets/README.md)。
+## Release readiness
 
-默认圆桌直径1.6米，显示、点击与物理边界一致。`campaign-materials-v4` 最大冲量为0.048 N·s，公共固定步120 Hz，每步执行两个240 Hz Rapier内步，以保持满力度下薄障碍的碰撞。桌边以币心是否越界判断倾倒；开局落桌仅改变呈现，不改变关卡物理初始布局。
+The latest gameplay validation passed 393 tests with one optional test skipped; type checking and production builds passed. Desktop browser checks include the visible computer charge, turn prompts and the opening overhang distance regression. Real-device touch/performance and CrazyGames Portal Preview remain pending.
 
-硬币撞击、桌面撞击和轻落桌使用真实 CC0 录音；滑行是更柔和的低频合成摩擦层，按桌上移动渐弱。静音、暂停和切关会清理当前声音。作者、来源与剪辑说明见 [音效来源](assets/audio-sources.md)。
+CrazyGames SDK v3 handles loading, gameplay start/stop and platform mute, with local/offline fallback. Ads, accounts, cloud saves and leaderboards are not integrated. Three covers and English submission copy are ready; the two preview videos and platform review are still outstanding. See the [upload checklist](artifacts/crazygames/UPLOAD-CHECKLIST.md).
 
-酒馆场景采用昏暗背景与桌面聚光，主界面标题为路径绘制 SVG；木桌七块拼板，抛光石面为程序绘制的黑金矿脉。厚底威士忌杯包含酒液与共享半分辨率折射，杯底避开桌面的共面闪烁，碰撞体向桌内延伸以封闭高速撞击缝隙。合法叠币结算会安全移除源币、等待目标币落稳，再正常接力。
+## Implementation and assets
 
-首页音量位于右上；游戏中音量下方为设置齿轮。单人计分板靠左，显示“x 分”和剩余复活的“x 次机会”，小号轮次位于面板下方，本地最高分在右下。设置内用播放、重转箭头、房屋图标表示继续游戏、重新开始、返回菜单，保留按钮名称与悬停提示。首次铁币/大理石提示解释重量和摩擦差异。背景音乐为轻柔和弦、低音与刷鼓伴奏，无突出萨克斯主奏，离线生成 MP3；生成方法和声音来源见 [音效来源](assets/audio-sources.md)。
+TypeScript + Vite + Three.js + Rapier 3D WASM, with HTML/CSS UI, Pointer Events and Web Audio. The Game Core is independent of Three.js and the DOM. AI searches replay production physics in a Worker; runtime play does not call an LLM.
 
-## GitHub Pages 发布
+The default round table is 1.6 m across. Rendering, input boundaries, level validation and physical support share its geometry. Physics runs at fixed 120 Hz with two Rapier integration substeps per step. Moving beyond the rim permits natural tipping; an actual fall and the opening-specific resting-overhang check remain separate. The material/config version is `campaign-materials-v4`.
 
-[发布工作流](.github/workflows/deploy-pages.yml) 在 main 推送后执行 npm ci、完整测试和生产构建，仅将 dist 上传到 Pages；也支持手动重跑。仓库 Pages 来源应设为 GitHub Actions。实际发布结果与提交版本见 [Actions](https://github.com/ljq61/FlickChain/actions/workflows/deploy-pages.yml)。构建使用相对基址，模型、MP3 和独立 AI Worker 从游戏子路径加载；Rapier 兼容版 WASM 随脚本打包。
+The animated hand uses the user's edited [Blender source](blender/pointing-hand-rigged.blend), [game adaptation](assets/flick-hand.blend) and [runtime GLB](public/models/flick-hand.glb). Export details and fingerprints are in the [asset documentation](assets/README.md). Coin sounds are edited CC0 recordings; background accompaniment is composed procedurally. Provenance is in [audio sources](assets/audio-sources.md).
 
-GitHub Pages 是当前公开静态站点交付。`dev_en` 已完成 CrazyGames SDK v3 生命周期适配及 Basic Launch 本地包；Developer Portal Preview、预览视频和正式平台提交仍未执行。提交材料见 [CrazyGames 上传清单](artifacts/crazygames/UPLOAD-CHECKLIST.md)。
+Random rounds preserve the survivor and use recipe, geometry and real-physics initial-settlement checks. The five authored layouts retain complete solution replay tests; this does not prove that every random layout can be fully cleared. See [level validation](tests/levels/README.md).
 
-## 项目文档
+## Documentation and deployment
 
-- [产品需求 PRD](docs/PRD.md)：规则、模式、体验、范围和产品验收。
-- [技术架构](docs/TECHNICAL_ARCHITECTURE.md)：物理、状态、接口、AI 与生命周期。
-- [任务计划](docs/TASK_PLAN.md)：分阶段任务、责任角色、依赖和验证入口。
-- [开发进度](docs/PROGRESS.md)：当前可玩范围、验证结果、剩余任务与资源版本。
-- [来源与决策记录](docs/SOURCES_AND_DECISIONS.md)：历史需求、本轮默认决策和证据边界。
-- [项目 Agent 说明](AGENTS.override.md)：开发门禁、职责与共享文件约束。
-- [配置迁移验证](docs/CONFIGURATION_VALIDATION.md)：迁移文件、模型、解析和实际加载状态。
+- [Product requirements](docs/PRD.md)
+- [Architecture](docs/TECHNICAL_ARCHITECTURE.md)
+- [Task plan](docs/TASK_PLAN.md)
+- [Progress and evidence](docs/PROGRESS.md)
+- [Sources and decisions](docs/SOURCES_AND_DECISIONS.md)
+- [Agent instructions](AGENTS.override.md)
 
-技术方向：TypeScript + Vite + Three.js + Rapier 3D WASM，HTML/CSS、Pointer Events、Web Audio。初期离线游玩、静态托管；运行时不接入大模型。
-
-## 执行顺序
-
-物理手感原型 → 整杆接力规则 → 连续随机单人/PVP/PVE → Worker AI调校 → 随机轮难度与材质体验打磨 → 性能与平台发行。
-
-PRD 规定产品行为，架构规定实现边界，任务计划规定顺序与完成条件。出现冲突时先更新决策记录并同步三份文档，避免各模块自行选择规则。已实现参数与验证结果以开发进度为准，后续调校仍需实际浏览器与设备验证。
+The [GitHub Pages workflow](.github/workflows/deploy-pages.yml) tests and builds `main`, then publishes only `dist/`. This does not publish the English branch or submit the game to CrazyGames. Check [Actions](https://github.com/ljq61/FlickChain/actions/workflows/deploy-pages.yml) for individual deployment results.
