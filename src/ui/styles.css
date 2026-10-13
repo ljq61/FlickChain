@@ -261,3 +261,28 @@ button svg { display: block; flex-shrink: 0; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+/* Brief, non-interactive ownership cue above the tabletop. */
+.turn-banner {
+  position: absolute;
+  z-index: 8;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 32px);
+  width: max-content;
+  padding: 16px 28px;
+  border: 1px solid rgba(223, 185, 103, .5);
+  border-radius: 12px;
+  background: rgba(24, 19, 13, .9);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, .35);
+  color: #f6dda3;
+  font: 600 clamp(23px, 4vw, 38px)/1.2 Georgia, serif;
+  text-align: center;
+  pointer-events: none;
+  animation: turn-arrive .2s ease-out;
+}
+@keyframes turn-arrive {
+  from { opacity: 0; transform: translate(-50%, -40%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+@media (prefers-reduced-motion: reduce) { .turn-banner { animation: none; } }

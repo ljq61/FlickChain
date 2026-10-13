@@ -180,7 +180,7 @@ describe('campaign scene resource continuity', () => {
     expect(samples).toHaveBeenCalledOnce();
   });
 
-  it('hides the charge meter on release, cancellation, overlays, AI, arrival and missing hand, then removes it on disposal', () => {
+  it('shows AI charge and hides the meter on release, cancellation, overlays, arrival and missing hand', () => {
     const width = 390, height = 844;
     Object.defineProperties(host, { clientWidth: { value: width }, clientHeight: { value: height } });
     vi.spyOn(scene.canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width, height } as DOMRect);
@@ -196,7 +196,15 @@ describe('campaign scene resource continuity', () => {
       scene.render(authoritative, ready, aim); expect(meter.hidden).toBe(false);
       scene.render(authoritative, { ...ready, phase }, aim); expect(meter.hidden).toBe(true);
     }
-    scene.render(authoritative, { ...ready, inputOwner: 'computer' }, aim); expect(meter.hidden).toBe(true);
+    const pose = vi.spyOn(finger as unknown as { setPose(...args: unknown[]): void }, 'setPose');
+    const computerAim = { ...aim, direction: { x: 1, z: 0 }, power: .4 };
+    scene.render(authoritative, { ...ready, inputOwner: 'computer' }, computerAim);
+    expect(finger.visible).toBe(true); expect(meter.hidden).toBe(false);
+    expect(pose.mock.lastCall?.[1]).toEqual(computerAim.direction);
+    expect(pose.mock.lastCall?.[2]).toBe(.4);
+    expect(meter.getAttribute('aria-valuenow')).toBe('40');
+    scene.render(authoritative, { ...ready, inputOwner: 'computer' }, null);
+    expect(finger.visible).toBe(false); expect(meter.hidden).toBe(true);
     scene.render(authoritative, null, aim); expect(meter.hidden).toBe(true);
     scene.render({ ...authoritative, coins: [] }, ready, aim); expect(meter.hidden).toBe(true);
     scene.render(authoritative, ready, { ...aim, power: NaN }); expect(meter.hidden).toBe(true);

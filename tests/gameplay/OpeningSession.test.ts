@@ -16,6 +16,25 @@ function finish(game: OpeningSession) {
 }
 afterEach(() => { vi.restoreAllMocks(); sessions.splice(0).forEach((game) => game.dispose()); });
 describe('production-physics opening distance comparison', () => {
+  it('counts the measured distance when a half-overhanging coin rests on the round table', async () => {
+    const config = level(); config.table = { shape: 'circle', width: 1.6, depth: 1.6, materialId: 'wood' };
+    const game = await OpeningSession.create(config, 'pvp'); sessions.push(game);
+    expect(game.shoot({ x: 0, z: -1 }, .75)).toBe(true);
+    finish(game);
+    const coin = game.frame.coins[0];
+    expect(coin.position.z).toBeLessThan(-.8);
+    expect(coin.position.z).toBeGreaterThan(-.835);
+    expect(coin.position.y).toBeGreaterThan(0);
+    expect(game.view.battle!.fallen[0]).toBe(false);
+    expect(game.view.battle!.distances[0]).toBeCloseTo(Math.hypot(coin.position.x, coin.position.z - .64), 5);
+    expect((game as unknown as { shotSteps: number }).shotSteps).toBeLessThan(PHYSICS_CONFIG.maxShotSteps);
+    expect(await game.advance()).toBe(true);
+    expect(game.shoot({ x: 0, z: -1 }, .74)).toBe(true);
+    finish(game);
+    expect(game.view.battle!.fallen).toEqual([false, false]);
+    expect(game.view.battle!.distances[0]!).toBeGreaterThan(game.view.battle!.distances[1]!);
+    expect(game.view.winner).toBe(0);
+  });
   it('launches both gold coins from the near side toward -Z, then chooses the farther safe contestant', async () => {
     const game = await create(); const initial = game.frame;
     expect(game.view).toMatchObject({ phase: 'ready', canSelectCoin: false, currentPlayer: 0, battle: { stage: 'opening', openingAttempt: 1 } });
@@ -66,6 +85,7 @@ describe('production-physics opening distance comparison', () => {
   it('treats timeout as a forfeited opening, without scoring a MISS', async () => {
     const game = await create();
     vi.spyOn(PhysicsWorld.prototype, 'isSettled').mockReturnValue(false);
+    vi.spyOn(PhysicsWorld.prototype, 'isCoinRestingOnTable').mockReturnValue(false);
     game.shoot({ x: 0, z: -1 }, .3);
     for (let step = 0; step < PHYSICS_CONFIG.maxShotSteps; step++) game.tick(PHYSICS_CONFIG.fixedDt);
     expect(game.view).toMatchObject({ phase: 'complete', scores: [0, 0], foulReasons: [], battle: { fallen: [true, false] } });

@@ -450,11 +450,11 @@ export class SceneManager {
     const requestedFocus = requestedFocusId ? frame.coins.find((coin) => coin.id === requestedFocusId) : undefined;
     this.tavern.setMenuView(view === null);
     this.desiredFocus.set(requestedFocus?.position.x ?? 0, 0, requestedFocus?.position.z ?? 0);
-    if (!aim) this.cameraFocus.lerp(this.desiredFocus, this.cameraReady ? 0.14 : 1);
+    if (!aim || view?.inputOwner === 'computer') this.cameraFocus.lerp(this.desiredFocus, this.cameraReady ? 0.14 : 1);
     // Selection retains enough context to choose a launch coin; aiming becomes a close tabletop view.
     const distance = requestedFocus && view ? Math.max(0.9, this.overviewDistance * 0.42)
       : this.overviewDistance;
-    if (!aim) this.orbitDistance = THREE.MathUtils.lerp(this.orbitDistance, distance, this.cameraReady ? 0.12 : 1);
+    if (!aim || view?.inputOwner === 'computer') this.orbitDistance = THREE.MathUtils.lerp(this.orbitDistance, distance, this.cameraReady ? 0.12 : 1);
     this.updateCamera();
     for (const [id, { group, config }] of this.obstacleMeshes) {
       const pose = this.obstacleTransition.pose(id);
@@ -475,7 +475,7 @@ export class SceneManager {
       this.coinShadows.delete(id);
     }
     const human = view?.inputOwner !== 'computer';
-    const ready = human && view?.phase === 'ready' && !transitioning;
+    const ready = (human || !!aim) && view?.phase === 'ready' && !transitioning;
     const selecting = human && view?.phase === 'selecting' && !transitioning;
     const pulse = this.reducedMotion.matches ? 0.5 : 0.5 + 0.5 * Math.sin(performance.now() * 0.006);
     this.glowMaterial.emissiveIntensity = this.ironGlowMaterial.emissiveIntensity = 0.12 + 0.25 * pulse;
@@ -525,7 +525,7 @@ export class SceneManager {
     }
     this.finger.visible = ready && activeOnTable;
     if (this.finger.visible) {
-      this.finger.setPose({ x: activeX, z: activeZ }, this.getFingerDirection(), aim?.power ?? 0,
+      this.finger.setPose({ x: activeX, z: activeZ }, aim?.direction ?? this.getFingerDirection(), aim?.power ?? 0,
         this.reducedMotion.matches ? 0 : performance.now() / 1000);
       this.cacheHandMeterBounds();
     }

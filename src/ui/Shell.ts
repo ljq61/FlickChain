@@ -43,6 +43,8 @@ export class Shell {
   private modalState = '';
   private previousFocus: HTMLElement | null = null;
   private announced = '';
+  private turnKey = '';
+  private turnUntil = 0;
   private menuState: 'home' | 'battle' = 'home';
 
   constructor(private readonly root: HTMLElement, private readonly levels: LevelConfig[], private readonly callbacks: Callbacks) {
@@ -67,6 +69,7 @@ export class Shell {
       </main>
       <section class="game-hud" data-el="hud" hidden aria-label="Game status"><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><strong data-el="score-one">0</strong><span data-el="score-one-label">Score</span></div><div class="score-cell" data-el="player-two" hidden><span data-el="score-two-label">Player 2</span><strong data-el="score-two">0</strong></div><div class="remaining-cell" data-el="remaining-cell"><strong data-el="remaining">3</strong><span data-el="remaining-label">Continues</span></div></div><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective" hidden>Keep the last coin for the next round</p></div></div></section>
       <footer class="play-footer" data-el="footer" hidden><div class="shot-prompt" data-el="shot-prompt"><div class="turn-label" data-el="turn-label" hidden></div><h2 data-el="prompt-title">Line up your shot</h2><p data-el="prompt-description">Drag empty space to aim · Pick a coin to start</p><p class="tutorial-tip" data-el="tutorial-tip" hidden></p></div><p class="best-score" data-el="best-score" hidden>Best: 0</p></footer>
+      <div class="turn-banner" data-el="turn-banner" role="status" aria-live="polite" aria-atomic="true" hidden></div>
       <div class="status-live" data-el="live" role="status" aria-live="polite" aria-atomic="true"></div>
       <aside class="notice-toast" data-el="notice" hidden aria-label="Progress notification"><p data-el="notice-message" role="status"></p><button type="button" class="notice-dismiss" data-action="dismiss-notice" aria-label="Close notification">Close</button></aside>
       <div class="loading-layer" data-el="loading" hidden><div class="loading-card" role="status"><span class="loading-dot" aria-hidden="true"></span><p data-el="loading-message">Preparing the table</p></div></div>
@@ -114,6 +117,7 @@ export class Shell {
   render(view: GameView | null, _completed: string[], sound: boolean, introducing = false, campaign?: CampaignView): void {
     if (this.view && !view) this.menuState = 'home';
     this.view = view;
+    this.updateTurnBanner(view, introducing);
     this.updateMenu();
     this.campaign = campaign;
     const transition = campaign?.transition;
@@ -170,7 +174,7 @@ export class Shell {
         title = 'Game paused'; description = 'Select Resume to keep playing'; turn = 'Paused';
       } else if (opening && view.phase !== 'error') {
         title = view.phase === 'complete' ? view.battle!.fallen[view.currentPlayer] ? 'Shot forfeited' : `${currentName} flicked ${openingDistance(view.currentPlayer)}`
-          : computer ? 'Computer is taking its shot' : 'Who Goes First?';
+          : computer ? view.computerCharging ? 'Computer is charging' : 'Computer is taking its shot' : 'Who Goes First?';
         description = view.phase === 'simulating' ? 'Wait for the coin to stop to measure the shot'
           : view.phase === 'complete' ? view.winner === 0 || view.winner === 1 ? `${view.winner === 0 && view.battle?.variant === 'pve' ? 'You go' : `${playerNames[view.winner]} goes`} first. Setting up nine coins for the match.`
             : 'Next player. If both shots tie or forfeit, try again.'
@@ -189,8 +193,8 @@ export class Shell {
         title = computer ? 'Computer is thinking' : 'Pick a coin to start';
         description = computer ? 'The computer is lining up its next shot' : 'Hit one coin directly for +1, then flick from it. Drag empty space to aim.';
       } else if (view.phase === 'ready') {
-        title = computer ? 'Computer is thinking' : 'Press and hold to charge';
-        description = computer ? 'The computer is lining up its next shot' : view.canSelectCoin
+        title = computer ? view.computerCharging ? 'Computer is charging' : 'Computer is thinking' : 'Press and hold to charge';
+        description = computer ? view.computerCharging ? 'Watch the hand and power meter' : 'The computer is lining up its next shot' : view.canSelectCoin
           ? 'Hold the finger for more power; release to flick. Tap a coin to switch.'
           : 'Use the coin you just hit. Hold longer for more power; release to flick.';
       } else if (failedDuringShot) {
@@ -233,6 +237,23 @@ export class Shell {
     this.updateLayers();
   }
 
+  private updateTurnBanner(view: GameView | null, introducing: boolean): void {
+    const banner = this.node('turn-banner');
+    if (!view || view.mode !== 'battle') { this.turnKey = ''; this.turnUntil = 0; banner.hidden = true; return; }
+    if (introducing || this.loading || this.externalError || !['ready', 'selecting'].includes(view.phase)) {
+      this.turnUntil = 0; banner.hidden = true; return;
+    }
+    const key = `${view.sessionId}:${view.battle?.stage ?? 'playing'}:${view.battle?.openingAttempt ?? 0}:${view.currentPlayer}`;
+    if (key !== this.turnKey) {
+      this.turnKey = key;
+      this.turnUntil = performance.now() + 1400;
+      this.text('turn-banner', view.battle?.variant === 'pve'
+        ? view.currentPlayer === 0 ? 'Your Turn' : 'Computer’s Turn'
+        : `Player ${view.currentPlayer + 1}’s Turn`);
+    }
+    banner.hidden = performance.now() >= this.turnUntil;
+  }
+
   setLoading(message: string | null): void {
     this.loading = message;
     this.element.querySelectorAll<HTMLButtonElement>('.home-menu button').forEach((button) => { button.disabled = !!message; });
@@ -269,6 +290,7 @@ export class Shell {
     const view = this.view;
     const error = this.externalError ?? (view?.phase === 'error' ? view.error : null);
     const state = error ? 'error' : view && (['failed', 'paused', 'error'].includes(view.phase) || (view.mode === 'battle' && view.phase === 'complete' && view.battle?.stage !== 'opening')) ? view.phase : '';
+    if (state || this.loading) { this.node('turn-banner').hidden = true; this.turnUntil = 0; }
     this.node('modal').dataset.variant = state === 'paused' ? 'settings' : 'result';
     this.node('modal-seal').hidden = state === 'paused';
     this.node('modal-kicker').hidden = state === 'paused';
