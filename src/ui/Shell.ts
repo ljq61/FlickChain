@@ -9,6 +9,8 @@ const FOUL_TEXT: Record<FoulReason, string> = {
   TIMEOUT: '硬币未能在时限内停稳',
 };
 
+const SECONDARY_HIT_TIP = '其他硬币之间的后续碰撞是合法的。';
+
 const COIN_ICON = '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="24" r="16" stroke="currentColor"/><circle cx="24" cy="24" r="12" stroke="currentColor" stroke-width="1.5"/><path d="M24 4v4m20 16h-4M24 44v-4M4 24h4" stroke="currentColor" stroke-width="2"/></svg>';
 const PEOPLE_ICON = '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="17" cy="14" r="6" stroke="currentColor" stroke-width="2"/><circle cx="33" cy="15" r="5" stroke="currentColor" stroke-width="2"/><path d="M5 39v-6a12 12 0 0 1 24 0v6H5Zm24-16a10 10 0 0 1 14 9v7H33" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const COMPUTER_ICON = '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><rect x="7" y="8" width="34" height="24" rx="4" stroke="currentColor" stroke-width="2"/><path d="M24 33v7m-9 0h18M16 18h2m12 0h2m-15 7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -42,6 +44,8 @@ export class Shell {
   private modalState = '';
   private previousFocus: HTMLElement | null = null;
   private announced = '';
+  private turnKey = '';
+  private turnUntil = 0;
   private menuState: 'home' | 'battle' = 'home';
 
   constructor(private readonly root: HTMLElement, private readonly levels: LevelConfig[], private readonly callbacks: Callbacks) {
@@ -65,6 +69,7 @@ export class Shell {
       </main>
       <section class="game-hud" data-el="hud" hidden aria-label="对局信息"><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><strong data-el="score-one">0</strong><span data-el="score-one-label">分</span></div><div class="score-cell" data-el="player-two" hidden><span data-el="score-two-label">玩家二</span><strong data-el="score-two">0</strong></div><div class="remaining-cell" data-el="remaining-cell"><strong data-el="remaining">3</strong><span data-el="remaining-label">次机会</span></div></div><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective" hidden>留住最后一枚，继续下一轮</p></div></div></section>
       <footer class="play-footer" data-el="footer" hidden><div class="shot-prompt" data-el="shot-prompt"><div class="turn-label" data-el="turn-label" hidden></div><h2 data-el="prompt-title">旋转视角，准备弹射</h2><p data-el="prompt-description">空白处拖动旋转 · 点选硬币开始</p><p class="tutorial-tip" data-el="tutorial-tip" hidden></p></div><p class="best-score" data-el="best-score" hidden>本地最高 0 分</p></footer>
+      <div class="turn-banner" data-el="turn-banner" role="status" aria-live="polite" aria-atomic="true" hidden></div>
       <div class="status-live" data-el="live" role="status" aria-live="polite" aria-atomic="true"></div>
       <aside class="notice-toast" data-el="notice" hidden aria-label="保存提示"><p data-el="notice-message" role="status"></p><button type="button" class="notice-dismiss" data-action="dismiss-notice" aria-label="关闭保存提示">关闭</button></aside>
       <div class="loading-layer" data-el="loading" hidden><div class="loading-card" role="status"><span class="loading-dot" aria-hidden="true"></span><p data-el="loading-message">正在准备棋盘</p></div></div>
@@ -112,6 +117,7 @@ export class Shell {
   render(view: GameView | null, _completed: string[], sound: boolean, introducing = false, campaign?: CampaignView): void {
     if (this.view && !view) this.menuState = 'home';
     this.view = view;
+    this.updateTurnBanner(view, introducing);
     this.updateMenu();
     this.campaign = campaign;
     const transition = campaign?.transition;
@@ -147,7 +153,7 @@ export class Shell {
       this.node('best-score').hidden = false;
       this.text('score-one-label', battle ? playerNames[0] : '分');
       this.text('score-two-label', playerNames[1]);
-      const openingDistance = (player: 0 | 1): string => view.battle!.fallen[player] ? '掉落弃权'
+      const openingDistance = (player: 0 | 1): string => view.battle!.fallen[player] ? '本杆弃权'
         : view.battle!.distances[player] === null ? '未弹' : `${Math.round(view.battle!.distances[player]! * 100)} cm`;
       this.text('score-one', opening ? openingDistance(0) : String(battle ? view.scores[0] : campaign?.score ?? view.scores[0]));
       this.text('score-two', opening ? openingDistance(1) : String(view.scores[1]));
@@ -166,13 +172,13 @@ export class Shell {
       if (view.phase === 'paused') {
         title = '棋盘已暂停'; description = '继续后从当前棋盘接着玩'; turn = '稍作休息';
       } else if (opening && view.phase !== 'error') {
-        title = view.phase === 'complete' ? view.battle!.fallen[view.currentPlayer] ? `${currentName}掉落，放弃先手` : `${currentName}弹出 ${openingDistance(view.currentPlayer)}`
-          : computer ? '电脑正在比远' : '比远争先';
+        title = view.phase === 'complete' ? view.battle!.fallen[view.currentPlayer] ? `${currentName}本杆弃权` : `${currentName}弹出 ${openingDistance(view.currentPlayer)}`
+          : computer ? view.computerCharging ? '电脑正在蓄力' : '电脑正在比远' : '比远争先';
         description = view.phase === 'simulating' ? '等这枚金币停稳，记录弹出的距离'
           : view.phase === 'complete' ? view.winner === 0 || view.winner === 1 ? `${playerNames[view.winner]}获得先手，准备九枚硬币`
             : '准备下一位；同距或双方掉落会重新比远'
-          : computer ? '各弹一枚，停稳更远者先手，掉落放弃先手'
-          : '按住手指蓄力，松手直弹；停稳更远者先手，掉落放弃先手';
+          : computer ? '各弹一枚，停稳更远者先手，掉落或超时放弃先手'
+          : '按住手指蓄力，松手直弹；停稳更远者先手，掉落或超时放弃先手';
         turn = `第 ${view.battle!.openingAttempt} 次比远 · ${currentName}`;
       } else if (view.phase === 'refilling') {
         title = view.battle?.variant === 'pve' ? '随机新增八枚硬币' : '重新摆满九枚硬币'; description = '残局和双方分数保留，硬币落稳后继续'; turn = '正在摆桌';
@@ -186,13 +192,14 @@ export class Shell {
         title = computer ? '电脑思考中' : '点选一枚硬币直接开始';
         description = computer ? '稍等片刻，电脑会选择并弹射一枚硬币' : '点中的硬币立即成为当前币；旋转空白区域可改变视角';
       } else if (view.phase === 'ready') {
-        title = computer ? '电脑思考中' : '按住硬币后的手指蓄力';
-        description = computer ? '让这一杆停稳后，再继续对战' : view.canSelectCoin
+        title = computer ? view.computerCharging ? '电脑正在蓄力' : '电脑思考中' : '按住硬币后的手指蓄力';
+        description = computer ? view.computerCharging ? '观察电脑的手指和力度条' : '电脑正在准备下一杆' : view.canSelectCoin
           ? '发射前可点其他硬币换起手；按得越久力度越大，松手弹射'
           : '接着刚击中的硬币继续；按得越久力度越大，松手弹射';
       } else if (failedDuringShot) {
         title = view.foulReasons.map((reason) => FOUL_TEXT[reason]).join(' · ');
         description = battle ? '本杆不得分，停稳后交给下一位玩家' : '停稳后查看本次结果'; turn = '失误 · 正在收尾';
+        if (view.foulReasons.includes('MULTI_HIT')) description = `${SECONDARY_HIT_TIP} ${description}`;
       } else if (view.phase === 'simulating') {
         title = '让硬币停一停'; description = '整杆停稳后，才能计分并接力'; turn = '弹射中';
       } else if (view.phase === 'complete') {
@@ -223,6 +230,23 @@ export class Shell {
       this.text('live', '');
     }
     this.updateLayers();
+  }
+
+  private updateTurnBanner(view: GameView | null, introducing: boolean): void {
+    const banner = this.node('turn-banner');
+    if (!view || view.mode !== 'battle') { this.turnKey = ''; this.turnUntil = 0; banner.hidden = true; return; }
+    if (introducing || this.loading || this.externalError || !['ready', 'selecting'].includes(view.phase)) {
+      this.turnUntil = 0; banner.hidden = true; return;
+    }
+    const key = `${view.sessionId}:${view.battle?.stage ?? 'playing'}:${view.battle?.openingAttempt ?? 0}:${view.currentPlayer}`;
+    if (key !== this.turnKey) {
+      this.turnKey = key;
+      this.turnUntil = performance.now() + 1400;
+      this.text('turn-banner', view.battle?.variant === 'pve'
+        ? view.currentPlayer === 0 ? '你的回合' : '电脑的回合'
+        : `${view.currentPlayer === 0 ? '玩家一' : '玩家二'}的回合`);
+    }
+    banner.hidden = performance.now() >= this.turnUntil;
   }
 
   setLoading(message: string | null): void {
@@ -261,6 +285,7 @@ export class Shell {
     const view = this.view;
     const error = this.externalError ?? (view?.phase === 'error' ? view.error : null);
     const state = error ? 'error' : view && (['failed', 'paused', 'error'].includes(view.phase) || (view.mode === 'battle' && view.phase === 'complete' && view.battle?.stage !== 'opening')) ? view.phase : '';
+    if (state || this.loading) { this.node('turn-banner').hidden = true; this.turnUntil = 0; }
     this.node('modal').dataset.variant = state === 'paused' ? 'settings' : 'result';
     this.node('modal-seal').hidden = state === 'paused';
     this.node('modal-kicker').hidden = state === 'paused';
@@ -291,6 +316,7 @@ export class Shell {
         const revive = view?.mode === 'challenge' && revives > 0 && !!this.callbacks.revive;
         title = revive ? '这一杆没接住' : '本次闯关结束';
         description = view!.foulReasons.map((reason) => FOUL_TEXT[reason]).join('；') + '。'
+          + (view!.foulReasons.includes('MULTI_HIT') ? SECONDARY_HIT_TIP : '')
           + (revive ? (view!.foulReasons.includes('FALL') ? '补回掉落的硬币，重新选择一枚继续。' : '桌面和累计分保留，重新选择一枚继续。') + `剩余 ${revives} 次复活机会。` : '再来一局，接得更远。');
         score = `累计 ${this.campaign?.score ?? view!.scores[0]} 分 · 最高 ${this.campaign?.bestScore ?? 0} 分\n到达第 ${this.campaign?.round ?? 1} 轮`;
         this.button('modal-primary', revive ? '复活继续' : '再来一局', revive ? 'revive' : 'retry');

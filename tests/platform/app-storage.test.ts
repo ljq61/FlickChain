@@ -15,7 +15,7 @@ const harness = vi.hoisted(() => ({
   creations: [] as Array<{ level: LevelConfig; mode: GameMode; firstPlayer: 0 | 1; battleWinScore: BattleWinScore }>,
   openings: [] as Array<{ view: GameView; frame: WorldFrame; level: LevelConfig; shoot: ReturnType<typeof vi.fn>; advance: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }>,
   aiRequests: [] as Array<{ kind: 'opening' | 'battle'; payload: LevelConfig | SessionSnapshot; resolve: (decision: AiShot | number) => void; reject: (error: Error) => void }>,
-  cancelAI: vi.fn(), disposeAI: vi.fn(), resetView: vi.fn(),
+  cancelAI: vi.fn(), disposeAI: vi.fn(), resetView: vi.fn(), renderScene: vi.fn(),
   handLoad: vi.fn(async () => {}),
   inputState: null as null | (() => { view: GameView | null; frame: WorldFrame | null }),
   inputCallbacks: null as null | { pickCoin: (id: string) => void; shoot: (direction: { x: number; z: number }, power: number) => void },
@@ -111,7 +111,7 @@ vi.mock('../../src/rendering/SceneManager', async () => {
   const { CoinArrival } = await import('../../src/rendering/CoinArrival');
   return { SceneManager: class {
     arrival = new CoinArrival(); clearing = 0;
-    initializeHand = harness.handLoad; setLevel = vi.fn(); resetView = harness.resetView; render = vi.fn(); focusCoin = vi.fn(); clearFocus = vi.fn(); dispose = vi.fn();
+    initializeHand = harness.handLoad; setLevel = vi.fn(); resetView = harness.resetView; render = harness.renderScene; focusCoin = vi.fn(); clearFocus = vi.fn(); dispose = vi.fn();
     beginCoinArrival(ids: string[]) { harness.arrivals.push(ids); this.arrival.begin(ids); }
     advanceCoinArrival(seconds: number) { return this.arrival.advance(seconds); }
     get isIntroducing() { return this.arrival.playing; }
@@ -457,7 +457,7 @@ describe('continuous Challenge app and persistence', () => {
       await initialize();
       const session = await reachBattle('pve', 1); frames(35);
       const initial = harness.aiRequests.slice().reverse().find(item => item.kind === 'battle')!;
-      initial.resolve(battleDecision(session)); await Promise.resolve(); frames(55);
+      initial.resolve(battleDecision(session)); await Promise.resolve(); frames(150);
       const carry = structuredClone(session.frame.coins.at(-1)!);
       session.frame.coins = retainedCount ? [carry] : [];
       session.view = { ...session.view, phase: 'refilling', scores: [6, 9], currentPlayer: 1,
@@ -471,7 +471,7 @@ describe('continuous Challenge app and persistence', () => {
       const fresh = harness.aiRequests.slice().reverse().find(item => item.kind === 'battle')!;
       expect((fresh.payload as SessionSnapshot).view).toMatchObject({ battleWinScore: 10, scores: [6, 9], remaining: 8 + retainedCount });
       fresh.resolve({ ...battleDecision(session), coinId: retainedCount ? carry.id : session.frame.coins[0].id });
-      await Promise.resolve(); frames(55);
+      await Promise.resolve(); frames(150);
       session.frame.coins = [structuredClone(session.frame.coins.at(-1)!)];
       session.view = { ...session.view, phase: 'refilling', remaining: 1, activeCoinId: session.frame.coins[0].id,
         canSelectCoin: false, revision: session.view.revision + 1 };
@@ -491,7 +491,7 @@ describe('continuous Challenge app and persistence', () => {
       await initialize();
       const session = await reachBattle('pve', 1); frames(35);
       const initial = harness.aiRequests.slice().reverse().find(item => item.kind === 'battle')!;
-      initial.resolve(battleDecision(session)); await Promise.resolve(); frames(55);
+      initial.resolve(battleDecision(session)); await Promise.resolve(); frames(150);
       expect(session.shoot).toHaveBeenCalledTimes(1);
       const carry = structuredClone(session.frame.coins.at(-1)!);
       session.frame.coins = [carry];
@@ -506,7 +506,7 @@ describe('continuous Challenge app and persistence', () => {
       expect((fresh.payload as SessionSnapshot).view).toMatchObject({ remaining: 9, scores: [3, 4], activeCoinId: carry.id, canSelectCoin: false });
       expect(session.frame.coins.find(coin => coin.id === carry.id)).toEqual(carry);
       const shot = { ...battleDecision(session), coinId: carry.id };
-      fresh.resolve(shot); await Promise.resolve(); frames(55);
+      fresh.resolve(shot); await Promise.resolve(); frames(150);
       expect(session.shoot).toHaveBeenCalledTimes(2);
       expect(session.shoot).toHaveBeenLastCalledWith(shot.direction, shot.power);
       expect(session.selectCoin).toHaveBeenCalledTimes(1); // initial free choice only
@@ -524,10 +524,50 @@ describe('continuous Challenge app and persistence', () => {
       expect(harness.inputState!().view).toBeNull();
       harness.inputCallbacks!.shoot({ x: 1, z: 0 }, 1); harness.inputCallbacks!.pickCoin(opening.level.activeCoinId);
       expect(opening.shoot).not.toHaveBeenCalled();
-      request.resolve(.64); await Promise.resolve(); frames(55);
+      request.resolve(.64); await Promise.resolve(); frames(150);
       expect(opening.shoot).toHaveBeenCalledExactlyOnceWith({ x: 0, z: -1 }, .64);
       expect(opening.view.phase).toBe('simulating');
       expect(harness.play).toHaveBeenCalledWith('flick', .64);
+    });
+
+    it('shows increasing computer charge in the accepted direction before firing exactly once', async () => {
+      await initialize();
+      const session = await reachBattle('pve', 1); frames(60);
+      const request = harness.aiRequests.at(-1)!;
+      const shot = { ...battleDecision(session), direction: { x: 1, z: 0 }, power: .8 };
+      request.resolve(shot); await Promise.resolve(); frames();
+      expect(session.selectCoin).toHaveBeenCalledWith(shot.coinId);
+      expect(session.shoot).not.toHaveBeenCalled();
+      expect(harness.renderScene.mock.lastCall?.[2]).toMatchObject({ direction: shot.direction, power: 0 });
+      frames(40);
+      const partial = harness.renderScene.mock.lastCall?.[2];
+      expect(partial.source).toEqual(session.frame.coins.find(coin => coin.id === shot.coinId)!.position);
+      expect(partial.power).toBeGreaterThan(0); expect(partial.power).toBeLessThan(shot.power);
+      expect(harness.renderScene.mock.lastCall?.[1].computerCharging).toBe(true);
+      expect(harness.inputState!().view).toBeNull();
+      expect(session.shoot).not.toHaveBeenCalled();
+      frames(100);
+      expect(session.shoot).toHaveBeenCalledExactlyOnceWith(shot.direction, shot.power);
+      expect(harness.renderScene.mock.lastCall?.[2]).toBeNull();
+    });
+
+    it.each(['pause', 'home', 'restart', 'dispose', 'hidden'] as const)('%s cancels a computer shot during visible charge', async action => {
+      await initialize();
+      const session = await reachBattle('pve', 1); frames(60);
+      harness.aiRequests.at(-1)!.resolve(battleDecision(session)); await Promise.resolve(); frames(35);
+      expect(harness.renderScene.mock.lastCall?.[2]?.power).toBeGreaterThan(0);
+      if (action === 'dispose') app!.dispose();
+      else if (action === 'hidden') {
+        const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+        document.dispatchEvent(new Event('visibilitychange')); hidden.mockRestore();
+      } else {
+        node<HTMLButtonElement>('[data-action="pause"]').click(); frames();
+        if (action === 'home') node<HTMLButtonElement>('[data-el="modal-tertiary"]').click();
+        if (action === 'restart') node<HTMLButtonElement>('[data-el="modal-secondary"]').click();
+      }
+      if (action !== 'dispose') { await Promise.resolve(); frames(150); }
+      expect(session.shoot).not.toHaveBeenCalled();
+      if (action === 'pause' || action === 'hidden') expect(harness.renderScene.mock.lastCall?.[2]).toBeNull();
     });
 
     it('passes the exact settled snapshot to normal AI and restores human controls after the turn changes', async () => {
@@ -543,7 +583,7 @@ describe('continuous Challenge app and persistence', () => {
       harness.inputCallbacks!.pickCoin(session.frame.coins[0].id); harness.inputCallbacks!.shoot({ x: 1, z: 0 }, .9);
       expect(session.selectCoin).not.toHaveBeenCalled(); expect(session.shoot).not.toHaveBeenCalled();
       const shot = battleDecision(session);
-      request.resolve(shot); await Promise.resolve(); frames(55);
+      request.resolve(shot); await Promise.resolve(); frames(150);
       expect(session.selectCoin).toHaveBeenCalledExactlyOnceWith(shot.coinId);
       expect(session.shoot).toHaveBeenCalledExactlyOnceWith(shot.direction, shot.power);
       expect(harness.inputState!().view).toBeNull();
@@ -575,7 +615,7 @@ describe('continuous Challenge app and persistence', () => {
         const fresh = harness.aiRequests.slice().reverse().find(item => item.kind === 'battle')!;
         expect(fresh).not.toBe(request);
         expect(session.shoot).not.toHaveBeenCalled();
-        fresh.resolve(battleDecision(session)); await Promise.resolve(); frames(55);
+        fresh.resolve(battleDecision(session)); await Promise.resolve(); frames(150);
         expect(session.shoot).toHaveBeenCalledTimes(1);
       } else if (action === 'home') {
         await vi.waitFor(() => expect(node('.flick-shell').dataset.screen).toBe('home')); frames(100);
@@ -611,7 +651,7 @@ describe('continuous Challenge app and persistence', () => {
         node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames(40);
         const fresh = harness.aiRequests.at(-1)!;
         expect(fresh).not.toBe(request); expect(fresh.kind).toBe('opening');
-        fresh.resolve(.58); await Promise.resolve(); frames(55);
+        fresh.resolve(.58); await Promise.resolve(); frames(150);
         expect(opening.shoot).toHaveBeenCalledExactlyOnceWith({ x: 0, z: -1 }, .58);
       } else if (action === 'home') {
         await vi.waitFor(() => expect(node('.flick-shell').dataset.screen).toBe('home')); frames(100);

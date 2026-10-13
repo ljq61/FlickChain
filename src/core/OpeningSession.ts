@@ -62,7 +62,7 @@ export class OpeningSession {
         if (this.feedback.length > 64) this.feedback.splice(0, this.feedback.length - 64);
         this.fell ||= events.fallenCoinIds.length > 0;
         this.shotSteps++;
-        this.quietSteps = this.physics.isSettled() ? this.quietSteps + 1 : 0;
+        this.quietSteps = this.physics.isSettled() || this.physics.isCoinRestingOnTable(this.config.activeCoinId) ? this.quietSteps + 1 : 0;
         if (this.quietSteps >= PHYSICS_CONFIG.settledSteps) this.settle(false);
         else if (this.shotSteps >= PHYSICS_CONFIG.maxShotSteps) this.settle(true);
       }

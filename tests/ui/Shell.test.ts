@@ -54,6 +54,42 @@ describe('Shell instant coin start UI', () => {
     expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('立即成为当前币');
   });
 
+  it('announces each battle turn once after arrival, including opening retries and match start', () => {
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
+    try {
+      const battle: GameView = { ...view('ready'), mode: 'battle', battle: {
+        variant: 'pve', stage: 'opening', openingAttempt: 1, distances: [null, null], fallen: [false, false],
+      } };
+      const banner = root.querySelector<HTMLElement>('[data-el="turn-banner"]')!;
+      shell.render(battle, [], true, true); expect(banner.hidden).toBe(true);
+      shell.render(battle, [], true); expect(banner.hidden).toBe(false); expect(banner.textContent).toBe('你的回合');
+      clock.mockReturnValue(1600); shell.render(battle, [], true); expect(banner.hidden).toBe(true);
+      shell.render({ ...battle, currentPlayer: 1 }, [], true); expect(banner.textContent).toBe('电脑的回合'); expect(banner.hidden).toBe(false);
+      shell.render({ ...battle, currentPlayer: 1, phase: 'paused' }, [], true); expect(banner.hidden).toBe(true);
+      shell.render({ ...battle, currentPlayer: 1 }, [], true); expect(banner.hidden).toBe(true);
+      shell.render({ ...battle, currentPlayer: 1, shotCount: 2, scores: [0, 2] }, [], true); expect(banner.hidden).toBe(true);
+      shell.render({ ...battle, currentPlayer: 1 }, [], true, true);
+      shell.render({ ...battle, currentPlayer: 1 }, [], true); expect(banner.hidden).toBe(true);
+      shell.render({ ...battle, battle: { ...battle.battle!, openingAttempt: 2 } }, [], true); expect(banner.hidden).toBe(false);
+      shell.render({ ...battle, battle: { ...battle.battle!, stage: 'playing' } }, [], true); expect(banner.textContent).toBe('你的回合');
+      shell.setLoading('Loading'); expect(banner.hidden).toBe(true);
+      shell.setLoading(null);
+      shell.render({ ...battle, currentPlayer: 1, battle: { ...battle.battle!, variant: 'pvp', stage: 'playing' } }, [], true);
+      expect(banner.textContent).toBe('玩家二的回合');
+      shell.setError('Error'); expect(banner.hidden).toBe(true);
+      shell.setError(null); shell.render(null, [], true); expect(banner.hidden).toBe(true);
+      shell.render({ ...battle, battle: { ...battle.battle!, variant: 'pvp' } }, [], true); expect(banner.textContent).toBe('玩家一的回合');
+    } finally { clock.mockRestore(); }
+  });
+
+  it('describes the visible computer charge in both opening and normal play', () => {
+    for (const stage of ['opening', 'playing'] as const) {
+      shell.render({ ...view('ready'), mode: 'battle', inputOwner: 'computer', currentPlayer: 1, computerCharging: true,
+        battle: { variant: 'pve', stage, openingAttempt: 1, distances: [null, null], fallen: [false, false] } }, [], true);
+      expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('电脑正在蓄力');
+    }
+  });
+
   it('prompts the finger hold charge in the ready phase', () => {
     shell.render(view('ready'), [], true);
     expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('按住硬币后的手指蓄力');
@@ -385,14 +421,17 @@ describe('Shell instant coin start UI', () => {
     expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('未弹');
     expect(root.querySelector<HTMLElement>('[data-el="remaining-cell"]')!.hidden).toBe(true);
     expect(root.querySelector('[data-el="level-name"]')!.textContent).toBe('比远争先');
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('掉落放弃先手');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('掉落或超时放弃先手');
     shell.render({ ...opening, phase: 'complete', battle: { ...opening.battle!, distances: [0.78, null] } }, [], true);
     expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('78 cm');
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
     expect(root.querySelector<HTMLButtonElement>('[data-el="pause"]')!.disabled).toBe(false);
+    shell.render({ ...opening, phase: 'complete', battle: { ...opening.battle!, distances: [1.448, null], fallen: [false, false] } }, [], true);
+    expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('145 cm');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('玩家一弹出 145 cm');
     shell.render({ ...opening, phase: 'complete', currentPlayer: 1, winner: 0, battle: { ...opening.battle!, distances: [0.78, null], fallen: [false, true] } }, [], true);
-    expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('掉落弃权');
-    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('玩家二掉落，放弃先手');
+    expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('本杆弃权');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('玩家二本杆弃权');
     expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('玩家一获得先手');
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
   });

@@ -316,10 +316,11 @@ export class PhysicsWorld {
     }
     return { contacts, fallenCoinIds, feedback };
   }
-  private supported(coin: CoinBinding): boolean {
+  private supported(coin: CoinBinding, allowRimOverhang = false): boolean {
     if (this.disposed) return false;
     const p = coin.body.translation();
-    if (tableClearance(this.level.table, p.x, p.z) <= 0 || p.y < PHYSICS_CONFIG.minSupportedCenterY || p.y > coinRadius(coin.materialId) + PHYSICS_CONFIG.supportTolerance) return false;
+    if (tableClearance(this.level.table, p.x, p.z) <= (allowRimOverhang ? -coinRadius(coin.materialId) : 0)
+      || p.y < PHYSICS_CONFIG.minSupportedCenterY || p.y > coinRadius(coin.materialId) + PHYSICS_CONFIG.supportTolerance) return false;
     let contact = false;
     this.world.contactPair(coin.collider, this.tableCollider, (manifold) => {
       // Table-top contact, including a naturally tilted coin; side contacts are not support.
@@ -335,6 +336,11 @@ export class PhysicsWorld {
     return Math.hypot(linear.x, linear.y, linear.z) < PHYSICS_CONFIG.settledLinearSpeed && Math.hypot(angular.x, angular.y, angular.z) < PHYSICS_CONFIG.settledAngularSpeed;
   }
   isQuiet(): boolean { return !this.disposed && [...this.coins].every(([id, coin]) => this.fallen.has(id) || this.quiet(coin)); }
+  /** Opening Flick may count a stationary overhang only while Rapier still reports real tabletop contact. */
+  isCoinRestingOnTable(id: string): boolean {
+    const coin = this.coins.get(id);
+    return !!coin && !this.fallen.has(id) && this.quiet(coin) && this.supported(coin, true);
+  }
   /** A resting stack is supported when real upward contacts form a chain to the table.
    * Heights alone never prove support: airborne coins still have to land in Rapier. */
   private supportedChain(id: string, excludedId: string | null = null, visiting = new Set<string>()): boolean {
