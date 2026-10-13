@@ -85,6 +85,8 @@ export interface GameView {
   /** App adds local opponent/phase information; Core still owns score and turn. */
   battle?: BattleView;
   inputOwner?: 'human' | 'computer';
+  /** Presentation only; the pending computer shot is still owned by GameApp. */
+  computerCharging?: boolean;
   /** Persisted with Core snapshots so Battle searches use the same ten-point goal. */
   battleWinScore?: BattleWinScore;
 }

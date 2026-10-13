@@ -49,6 +49,7 @@ export class GameApp {
   private aiPending = false;
   private aiAge = 0;
   private aiDecision: AiShot | number | null = null;
+  private aiCharge: { game: GameSession | OpeningSession; revision: number; coinId: string; direction: Direction; power: number; age: number } | null = null;
   private get game(): GameSession | OpeningSession | null { return this.opening ?? this.session; }
   private get gameView(): GameView | null {
     const view = this.game?.view ?? null;
@@ -56,6 +57,7 @@ export class GameApp {
       view.battle ??= { ...this.battle.results, stage: 'playing' };
       view.battleWinScore ??= 10;
       view.inputOwner = this.battle.variant === 'pve' && view.currentPlayer === 1 ? 'computer' : 'human';
+      view.computerCharging = !!this.aiCharge && view.phase === 'ready';
     }
     return view;
   }
@@ -182,6 +184,7 @@ export class GameApp {
     this.aiPending = false;
     this.aiAge = 0;
     this.aiDecision = null;
+    this.aiCharge = null;
   }
 
   private failBattle(error: unknown): void {
@@ -265,10 +268,26 @@ export class GameApp {
     if (!this.battle || this.battle.variant !== 'pve' || !game || !view || view.currentPlayer !== 1
       || !['ready', 'selecting'].includes(view.phase) || this.menu || this.loading || this.battle.arriving
       || this.battle.advancing || this.scene.isIntroducing) return;
+    if (this.aiCharge) {
+      const charge = this.aiCharge;
+      if (charge.game !== game || charge.revision !== view.revision || charge.coinId !== view.activeCoinId) {
+        this.cancelAI();
+        return;
+      }
+      charge.age += elapsed;
+      // Give the camera/hand time to arrive, then show the selected power before releasing.
+      if (charge.age >= .35 + Math.max(.65, charge.power * 1.25) + .12) {
+        this.aiCharge = null; this.aiPending = false; this.aiAge = 0;
+        if (game.shoot(charge.direction, charge.power)) {
+          this.impactIntensity = .3 + charge.power * .7; this.sound.play('flick', charge.power);
+        } else this.failBattle('电脑弹射状态无效');
+      }
+      return;
+    }
     this.aiAge += elapsed;
     if (this.aiDecision !== null && this.aiAge >= .8) {
       const decision = this.aiDecision;
-      this.aiDecision = null; this.aiPending = false; this.aiAge = 0;
+      this.aiDecision = null;
       if (typeof decision !== 'number') {
         if (view.canSelectCoin) {
           if (!this.session?.selectCoin(decision.coinId)) { this.failBattle('电脑选币无效'); return; }
@@ -276,9 +295,12 @@ export class GameApp {
         } else if (view.activeCoinId !== decision.coinId) { this.failBattle('电脑接力币已变化'); return; }
       }
       const power = typeof decision === 'number' ? decision : decision.power;
-      if (game.shoot(typeof decision === 'number' ? { x: 0, z: -1 } : decision.direction, power)) {
-        this.impactIntensity = .3 + power * .7; this.sound.play('flick', power);
-      } else this.failBattle('电脑弹射状态无效');
+      const selected = game.view;
+      if (!selected.activeCoinId) { this.failBattle('电脑选币无效'); return; }
+      this.scene.focusCoin(selected.activeCoinId);
+      this.aiCharge = { game, revision: selected.revision, coinId: selected.activeCoinId,
+        direction: typeof decision === 'number' ? { x: 0, z: -1 } : { ...decision.direction }, power, age: 0 };
+      this.sound.play('aim');
       return;
     }
     if (this.aiPending || this.aiAge < .4) return;
@@ -514,6 +536,12 @@ export class GameApp {
       // The charge is presentation state: hold duration drives both the finger pose and the shot power.
       const charge = this.menu || this.loading ? null : this.pointer.charge();
       this.aim = charge ? { source: charge.source, direction: this.scene.getAimDirection(), power: chargePower(charge.elapsedMs) } : null;
+      if (this.aiCharge && this.gameView?.phase === 'ready' && this.gameView.inputOwner === 'computer') {
+        const computer = this.aiCharge;
+        const source = this.game?.frame.coins.find(coin => coin.id === computer.coinId)?.position;
+        if (source) this.aim = { source: { ...source }, direction: computer.direction,
+          power: computer.power * Math.min(1, Math.max(0, computer.age - .35) / Math.max(.65, computer.power * 1.25)) };
+      }
       if (charge && !this.charging) this.sound.play('aim');
       this.charging = !!charge;
       // Metallic scrape: track the fastest on-table mover while the shot is settling.
