@@ -50,21 +50,21 @@ describe('Shell instant coin start UI', () => {
     shell.render(view('selecting'), [], true);
     expect(root.querySelector('[data-el="selection-actions"]')).toBeNull();
     expect(root.querySelector('[data-el="confirm-selection"]')).toBeNull();
-    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Tap a coin to start');
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('Hit exactly one target');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Pick a coin to start');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('Hit one coin directly for +1');
   });
 
   it('prompts the finger hold charge in the ready phase', () => {
     shell.render(view('ready'), [], true);
-    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Hold the finger to charge');
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('longer for power');
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('Tap another coin to switch');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Press and hold to charge');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('more power');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('Tap a coin to switch');
   });
 
   it('explains the fixed target after a relay', () => {
     shell.render({ ...view('ready'), canSelectCoin: false, chain: 1 }, [], true);
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('the coin you hit');
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).not.toContain('Tap another coin to switch');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('the coin you just hit');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).not.toContain('Tap a coin to switch');
   });
 
   it('keeps sound and settings in one corner rail, with no footer navigation', () => {
@@ -72,7 +72,7 @@ describe('Shell instant coin start UI', () => {
     const controls = root.querySelector('.topbar .corner-controls')!;
     const buttons = controls.querySelectorAll<HTMLButtonElement>('button');
     expect(Array.from(buttons, (button) => button.dataset.action)).toEqual(['sound', 'pause']);
-    expect(buttons[1].getAttribute('aria-label')).toBe('Game settings');
+    expect(buttons[1].getAttribute('aria-label')).toBe('Pause game');
     expect(buttons[1].hidden).toBe(false);
     expect(root.querySelector('[data-el="footer"] button')).toBeNull();
     buttons[1].click();
@@ -112,11 +112,13 @@ describe('Shell instant coin start UI', () => {
     const pvp = root.querySelector<HTMLButtonElement>('[data-action="pvp"]')!;
     const pve = root.querySelector<HTMLButtonElement>('[data-action="pve"]')!;
     expect(battle.textContent).toBe('Local Battle');
+    expect(pvp.textContent).toBe('2 Players');
+    expect(pve.textContent).toBe('Vs. Computer');
     battle.click();
     expect(callbacks.start).not.toHaveBeenCalled();
     expect(root.querySelector<HTMLElement>('[data-el="main-actions"]')!.hidden).toBe(true);
     expect(root.querySelector<HTMLElement>('[data-el="battle-actions"]')!.hidden).toBe(false);
-    expect(root.querySelector('[data-el="battle-actions"] .menu-progress')!.textContent).toBe('Opening Flick · First to 10');
+    expect(root.querySelector('[data-el="battle-actions"] .menu-progress')!.textContent).toBe('First to 10 points');
     expect(document.activeElement).toBe(pvp);
     shell.render(null, [], false);
     expect(root.querySelector<HTMLElement>('[data-el="battle-actions"]')!.hidden).toBe(false);
@@ -203,7 +205,7 @@ describe('Shell instant coin start UI', () => {
       const tip = root.querySelector<HTMLElement>('[data-el="tutorial-tip"]')!;
       expect(tip.hidden).toBe(false);
       expect(tip.textContent).toBe(tutorial);
-      expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Hold the finger to charge');
+      expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Press and hold to charge');
       expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('release to flick');
       expect(root.querySelector('[data-el="live"]')!.textContent).toContain(tutorial);
     }
@@ -214,7 +216,7 @@ describe('Shell instant coin start UI', () => {
   });
 
   it('teaches the full charge timeout for the early ready shots without replacing material tips', () => {
-    const chargeTip = 'At full power, holding for 2 more seconds cancels. Release to reset.';
+    const chargeTip = 'Release within 2 seconds of full charge, or the shot is canceled.';
     const earlyCampaign = { ...campaign, round: 1 };
     shell.render(view('selecting'), [], true, false, earlyCampaign);
     expect(root.querySelector<HTMLElement>('[data-el="tutorial-tip"]')!.hidden).toBe(true);
@@ -235,7 +237,7 @@ describe('Shell instant coin start UI', () => {
     shell.render(view('ready'), [], true, false, campaign);
     expect(root.querySelector('[data-el="footer"] [data-action="retry"]')).toBeNull();
     shell.render(view('paused'), [], true, false, campaign);
-    expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('Game Settings');
+    expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('Paused');
     for (const name of ['modal-seal', 'modal-kicker', 'modal-description']) {
       expect(root.querySelector<HTMLElement>(`[data-el="${name}"]`)!.hidden).toBe(true);
     }
@@ -273,7 +275,7 @@ describe('Shell instant coin start UI', () => {
       expect(root.querySelector<HTMLElement>(`[data-el="${name}"]`)!.hidden).toBe(false);
     }
     expect(root.querySelector('[data-el="modal"]')!.getAttribute('aria-describedby')).toBe('result-description');
-    for (const [button, label] of [[primary, 'Continue Run'], [secondary, 'Restart'], [tertiary, 'Main Menu']] as const) {
+    for (const [button, label] of [[primary, 'Continue'], [secondary, 'Restart'], [tertiary, 'Main Menu']] as const) {
       expect(button.textContent).toBe(label);
       expect(button.querySelector('svg')).toBeNull();
       expect(button.hasAttribute('aria-label')).toBe(false);
@@ -306,11 +308,11 @@ describe('Shell instant coin start UI', () => {
     shell.render(view('complete'), [], true, false, { ...campaign, transition: 'clearing' });
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
     expect(root.querySelector('[data-action="next"]')).toBeNull();
-    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toContain('for the next round');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toContain('next round');
     expect(root.querySelector('[data-el="footer"] [data-action="retry"]')).toBeNull();
     expect(root.querySelector<HTMLButtonElement>('[data-el="pause"]')!.disabled).toBe(false);
     shell.render({ ...view('ready'), canSelectCoin: false }, [], true, true, { ...campaign, round: 4, transition: 'arriving' });
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('the remaining coin');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('last coin carries over');
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
   });
 
@@ -320,12 +322,12 @@ describe('Shell instant coin start UI', () => {
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
     shell.render(failure, [], true, false, campaign);
     const primary = root.querySelector<HTMLButtonElement>('[data-el="modal-primary"]')!;
-    expect(primary.textContent).toBe('Continue Run');
+    expect(primary.textContent).toBe('Continue');
     expect(document.activeElement).toBe(primary);
-    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain('Fallen coins return');
+    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain('Fallen coins will return');
     for (const revivesRemaining of [3, 2, 1] as const) {
       shell.render(failure, [], true, false, { ...campaign, revivesRemaining });
-      expect(primary.textContent).toBe('Continue Run');
+      expect(primary.textContent).toBe('Continue');
       expect(primary.dataset.action).toBe('revive');
       expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain(`${revivesRemaining} ${revivesRemaining === 1 ? 'continue' : 'continues'} left`);
       expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe(`${revivesRemaining} ${revivesRemaining === 1 ? 'continue' : 'continues'} left`);
@@ -337,7 +339,7 @@ describe('Shell instant coin start UI', () => {
     shell.render(failure, [], true, false, { ...campaign, revivesRemaining: 0 });
     expect(primary.textContent).toBe('Play Again');
     expect(primary.dataset.action).toBe('retry');
-    expect(root.querySelector('[data-el="modal-score"]')!.textContent).toBe('Score: 9 · Best: 17\nRound 3 reached');
+    expect(root.querySelector('[data-el="modal-score"]')!.textContent).toBe('Score: 9 · Best: 17\nReached Round 3');
     expect(root.querySelector('[data-action="revive"]')).toBeNull();
   });
 
@@ -356,7 +358,7 @@ describe('Shell instant coin start UI', () => {
     shell.render(view('ready'), [], true, true, { ...campaign, transition: 'arriving' });
     expect(document.activeElement).toBe(pause);
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
-    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Coins are landing');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('New coins are dropping in');
   });
 
   it('keeps the local battle result and scores', () => {
@@ -382,7 +384,7 @@ describe('Shell instant coin start UI', () => {
     expect(root.querySelector('[data-el="modal-primary"]')!.hasAttribute('aria-label')).toBe(false);
     expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain('First to 10');
     shell.render({ ...view('ready'), mode: 'battle', phase: 'refilling' }, [], true);
-    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Refilling to nine coins');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Refilling to 9 coins');
   });
 
   it('shows both opening distances and a forfeited coin without treating the trial as match completion', () => {
@@ -394,15 +396,15 @@ describe('Shell instant coin start UI', () => {
     expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('Ready');
     expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('Ready');
     expect(root.querySelector<HTMLElement>('[data-el="remaining-cell"]')!.hidden).toBe(true);
-    expect(root.querySelector('[data-el="level-name"]')!.textContent).toBe('Opening Flick');
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('falling forfeits');
+    expect(root.querySelector('[data-el="level-name"]')!.textContent).toBe('Who Goes First?');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('fall or timeout forfeits');
     shell.render({ ...opening, phase: 'complete', battle: { ...opening.battle!, distances: [0.78, null] } }, [], true);
     expect(root.querySelector('[data-el="score-one"]')!.textContent).toBe('78 cm');
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
     expect(root.querySelector<HTMLButtonElement>('[data-el="pause"]')!.disabled).toBe(false);
     shell.render({ ...opening, phase: 'complete', currentPlayer: 1, winner: 0, battle: { ...opening.battle!, distances: [0.78, null], fallen: [false, true] } }, [], true);
     expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('Forfeit');
-    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe("Player 2's coin fell off");
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe("Shot forfeited");
     expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('Player 1 goes first');
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
   });
@@ -422,8 +424,8 @@ describe('Shell instant coin start UI', () => {
       expect(root.querySelector('[data-el="mode"]')!.textContent).toBe('First to 10');
     }
     shell.render({ ...battle, phase: 'refilling' }, [], true);
-    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Adding eight new coins');
-    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('The table and scores stay');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Adding 8 new coins');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('Scores and remaining coins carry over');
     shell.render({ ...battle, phase: 'paused' }, [], true);
     expect(root.querySelector('[data-el="modal"]')!.getAttribute('data-variant')).toBe('settings');
     expect(root.querySelector('[data-el="modal-primary"]')!.getAttribute('aria-label')).toBe('Resume');
@@ -438,9 +440,9 @@ describe('Shell instant coin start UI', () => {
 
   it('uses English accessible names for menus, sound, and notices', () => {
     expect(root.querySelector('[data-action="challenge"]')!.textContent).toBe('Solo Play');
-    expect(root.querySelector('.corner-controls')!.getAttribute('aria-label')).toBe('Sound and settings');
-    expect(root.querySelector('[data-action="pvp"]')!.getAttribute('aria-label')).toBe('PVP: Player vs Player');
-    expect(root.querySelector('[data-action="pve"]')!.getAttribute('aria-label')).toBe('PVE: Play vs Computer');
+    expect(root.querySelector('.corner-controls')!.getAttribute('aria-label')).toBe('Game controls');
+    expect(root.querySelector('[data-action="pvp"]')!.getAttribute('aria-label')).toBe('2 Players on this device');
+    expect(root.querySelector('[data-action="pve"]')!.getAttribute('aria-label')).toBe('Play against the computer');
     const back = root.querySelector<HTMLButtonElement>('[data-action="battle-back"]')!;
     expect(back.getAttribute('aria-label')).toBe('Back to Main Menu');
     expect(back.title).toBe('Back to Main Menu');
@@ -456,9 +458,9 @@ describe('Shell instant coin start UI', () => {
     const notice = root.querySelector<HTMLElement>('[data-el="notice"]')!;
     const dismiss = root.querySelector<HTMLButtonElement>('[data-action="dismiss-notice"]')!;
     expect(notice.hidden).toBe(false);
-    expect(notice.getAttribute('aria-label')).toBe('Save notice');
-    expect(dismiss.textContent).toBe('Dismiss');
-    expect(dismiss.getAttribute('aria-label')).toBe('Dismiss save notice');
+    expect(notice.getAttribute('aria-label')).toBe('Progress notification');
+    expect(dismiss.textContent).toBe('Close');
+    expect(dismiss.getAttribute('aria-label')).toBe('Close notification');
     expect(root.querySelector('[data-el="notice-message"]')!.textContent).toContain('keep playing');
     dismiss.click();
     expect(notice.hidden).toBe(true);
@@ -468,20 +470,46 @@ describe('Shell instant coin start UI', () => {
   });
 
   it.each([
-    ['MISS', 'No target coin hit'],
-    ['MULTI_HIT', 'Hit more than one target coin'],
+    ['MISS', 'No coins hit'],
+    ['MULTI_HIT', 'The flicked coin hit more than one coin directly'],
     ['FALL', 'A coin fell off the table'],
-    ['TIMEOUT', 'Coins did not stop in time'],
+    ['TIMEOUT', 'Coins took too long to stop'],
   ] as const)('explains %s in English while settling and in the result', (reason, explanation) => {
     shell.render({ ...view('simulating'), foulReasons: [reason] }, [], true, false, campaign);
     expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
     expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe(explanation);
-    expect(root.querySelector('[data-el="turn-label"]')!.textContent).toBe('Foul · Settling');
+    expect(root.querySelector('[data-el="turn-label"]')!.textContent).toBe('Foul · Coins in motion');
     expect(root.querySelector('[data-el="live"]')!.textContent).toContain(explanation);
+    if (reason === 'MULTI_HIT') {
+      expect(explanation).toContain('flicked coin');
+      expect(explanation).toContain('directly');
+      expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('Other coins can hit each other.');
+    }
     shell.render({ ...view('failed'), foulReasons: [reason] }, [], true, false, campaign);
     expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('Chain broken');
     expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain(explanation);
-    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain(reason === 'FALL' ? 'Fallen coins return' : 'Your table and score stay');
+    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain(reason === 'FALL' ? 'Fallen coins will return' : 'Keep your score and coins');
+    if (reason === 'MULTI_HIT') expect(root.querySelector('[data-el="modal-description"]')!.textContent).toContain('Other coins can hit each other.');
+  });
+
+  it('describes an opening forfeit without claiming that the coin necessarily fell', () => {
+    // OpeningSession uses fallen for both a fall and a shot that times out on the table.
+    shell.render({
+      ...view('complete'), mode: 'battle', currentPlayer: 1, winner: 0,
+      battle: { variant: 'pve', stage: 'opening', distances: [0.8, 0.5], fallen: [false, true], openingAttempt: 1 },
+    }, [], true);
+    expect(root.querySelector('[data-el="score-two"]')!.textContent).toBe('Forfeit');
+    expect(root.querySelector('[data-el="prompt-title"]')!.textContent).toBe('Shot forfeited');
+    expect(root.querySelector('[data-el="live"]')!.textContent).not.toContain('coin fell');
+    expect(root.querySelector('[data-el="prompt-description"]')!.textContent).toContain('You go first');
+    expect(root.querySelector<HTMLElement>('[data-el="modal-layer"]')!.hidden).toBe(true);
+  });
+
+  it('shows a complete final-run sentence even when no foul reason is supplied', () => {
+    shell.render(view('failed'), [], true, false, { ...campaign, revivesRemaining: 0 });
+    expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('Game over');
+    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toBe('Play again to beat your best score.');
+    expect(root.querySelector('[data-el="modal-primary"]')!.textContent).toBe('Play Again');
   });
 
   it('labels the last continue in the singular without changing the starting allowance', () => {
@@ -527,8 +555,8 @@ describe('Shell instant coin start UI', () => {
       shell.render({ ...view(phase), foulReasons: phase === 'failed' ? ['MISS'] : [] }, [], false, false, { ...campaign, round: 1 });
       assertEnglish();
     }
-    expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('Reset the table');
-    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toBe('Something went wrong. Restart to prepare the table again.');
+    expect(root.querySelector('[data-el="modal-title"]')!.textContent).toBe('Something went wrong');
+    expect(root.querySelector('[data-el="modal-description"]')!.textContent).toBe('Restart the game or return to the Main Menu.');
     shell.setError('The table could not be loaded. Please restart.');
     expect(root.querySelector('[data-el="modal-description"]')!.textContent).toBe('The table could not be loaded. Please restart.');
     assertEnglish();

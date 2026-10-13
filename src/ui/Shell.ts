@@ -3,11 +3,12 @@ import { TITLE_LOGO } from './TitleLogo';
 import './styles.css';
 
 const FOUL_TEXT: Record<FoulReason, string> = {
-  MISS: 'No target coin hit',
-  MULTI_HIT: 'Hit more than one target coin',
+  MISS: 'No coins hit',
+  MULTI_HIT: 'The flicked coin hit more than one coin directly',
   FALL: 'A coin fell off the table',
-  TIMEOUT: 'Coins did not stop in time',
+  TIMEOUT: 'Coins took too long to stop',
 };
+const SECONDARY_HIT_TIP = 'Other coins can hit each other.';
 
 const COIN_ICON = '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="24" r="16" stroke="currentColor"/><circle cx="24" cy="24" r="12" stroke="currentColor" stroke-width="1.5"/><path d="M24 4v4m20 16h-4M24 44v-4M4 24h4" stroke="currentColor" stroke-width="2"/></svg>';
 const PEOPLE_ICON = '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="17" cy="14" r="6" stroke="currentColor" stroke-width="2"/><circle cx="33" cy="15" r="5" stroke="currentColor" stroke-width="2"/><path d="M5 39v-6a12 12 0 0 1 24 0v6H5Zm24-16a10 10 0 0 1 14 9v7H33" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -52,22 +53,22 @@ export class Shell {
       <div class="table-scene" data-el="canvas-host"></div>
       <header class="topbar">
         <div class="brand"><span class="brand-mark">${COIN_ICON}</span><div><span class="brand-name">FlickChain</span></div></div>
-        <nav class="corner-controls" aria-label="Sound and settings">
+        <nav class="corner-controls" aria-label="Game controls">
         <button class="quiet-button sound-button" type="button" data-action="sound" data-el="sound" aria-pressed="true" aria-label="Sound on"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M5 10h5l6-5v18l-6-5H5V10Z" fill="currentColor" stroke="currentColor" stroke-linejoin="round"/><path class="sound-waves" d="M20 9a7 7 0 0 1 0 10m3-13a11 11 0 0 1 0 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="sound-muted" d="m20 11 6 6m0-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="status-label" data-el="sound-label">Sound on</span></button>
-        <button type="button" class="quiet-button settings-button" data-action="pause" data-el="pause" aria-label="Game settings" hidden><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="m11.5 3-.7 3-2 .9-2.7-.8-2.5 4.3 2 2.2v2.8l-2 2.2 2.5 4.3 2.7-.8 2 .9.7 3h5l.7-3 2-.9 2.7.8 2.5-4.3-2-2.2v-2.8l2-2.2-2.5-4.3-2.7.8-2-.9-.7-3h-5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="14" cy="14" r="4" stroke="currentColor" stroke-width="1.7"/></svg></button>
+        <button type="button" class="quiet-button settings-button" data-action="pause" data-el="pause" aria-label="Pause game" hidden><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="m11.5 3-.7 3-2 .9-2.7-.8-2.5 4.3 2 2.2v2.8l-2 2.2 2.5 4.3 2.7-.8 2 .9.7 3h5l.7-3 2-.9 2.7.8 2.5-4.3-2-2.2v-2.8l2-2.2-2.5-4.3-2.7.8-2-.9-.7-3h-5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="14" cy="14" r="4" stroke="currentColor" stroke-width="1.7"/></svg></button>
         </nav>
       </header>
       <div class="game-brand" data-el="game-brand" aria-hidden="true" hidden>${TITLE_LOGO}</div>
       <main class="home-menu" data-el="home">
         <div class="menu-intro"><h1 class="title-logo" aria-label="FlickChain">${TITLE_LOGO}</h1></div>
         <div class="menu-actions" data-el="main-actions"><button type="button" class="primary-button menu-button" data-action="challenge"><span class="button-icon">${COIN_ICON}</span><span class="button-label">Solo Play</span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button" data-action="battle"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">Local Battle</span>${CHEVRON_ICON}</button><p class="menu-progress" data-el="progress">Best: 0</p></div>
-        <div class="menu-actions battle-menu" data-el="battle-actions" hidden><div class="battle-menu-heading"><button type="button" class="quiet-button menu-back" data-action="battle-back" aria-label="Back to Main Menu" title="Back to Main Menu">${BACK_ICON}</button><h2>Local Battle</h2></div><button type="button" class="primary-button menu-button battle-choice" data-action="pvp" aria-label="PVP: Player vs Player"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">PVP<small>Two Players</small></span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button battle-choice" data-action="pve" aria-label="PVE: Play vs Computer"><span class="button-icon">${COMPUTER_ICON}</span><span class="button-label">PVE<small>vs Computer</small></span>${CHEVRON_ICON}</button><p class="menu-progress">Opening Flick · First to 10</p></div>
-        <p class="table-caption">One table. Every coin is shared.</p>
+        <div class="menu-actions battle-menu" data-el="battle-actions" hidden><div class="battle-menu-heading"><button type="button" class="quiet-button menu-back" data-action="battle-back" aria-label="Back to Main Menu" title="Back to Main Menu">${BACK_ICON}</button><h2>Local Battle</h2></div><button type="button" class="primary-button menu-button battle-choice" data-action="pvp" aria-label="2 Players on this device"><span class="button-icon">${PEOPLE_ICON}</span><span class="button-label">2 Players</span>${CHEVRON_ICON}</button><button type="button" class="secondary-button menu-button battle-choice" data-action="pve" aria-label="Play against the computer"><span class="button-icon">${COMPUTER_ICON}</span><span class="button-label">Vs. Computer</span>${CHEVRON_ICON}</button><p class="menu-progress">First to 10 points</p></div>
+        <p class="table-caption">All coins are shared.</p>
       </main>
-      <section class="game-hud" data-el="hud" hidden aria-label="Game information"><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><strong data-el="score-one">0</strong><span data-el="score-one-label">Score</span></div><div class="score-cell" data-el="player-two" hidden><span data-el="score-two-label">Player 2</span><strong data-el="score-two">0</strong></div><div class="remaining-cell" data-el="remaining-cell"><strong data-el="remaining">3</strong><span data-el="remaining-label">Continues</span></div></div><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective" hidden>Keep the last coin for the next round</p></div></div></section>
-      <footer class="play-footer" data-el="footer" hidden><div class="shot-prompt" data-el="shot-prompt"><div class="turn-label" data-el="turn-label" hidden></div><h2 data-el="prompt-title">Rotate the view, then flick</h2><p data-el="prompt-description">Drag empty space to rotate · Tap a coin to start</p><p class="tutorial-tip" data-el="tutorial-tip" hidden></p></div><p class="best-score" data-el="best-score" hidden>Best: 0</p></footer>
+      <section class="game-hud" data-el="hud" hidden aria-label="Game status"><div class="score-panel"><div class="scoreboard" data-el="scoreboard"><div class="score-cell" data-el="player-one"><strong data-el="score-one">0</strong><span data-el="score-one-label">Score</span></div><div class="score-cell" data-el="player-two" hidden><span data-el="score-two-label">Player 2</span><strong data-el="score-two">0</strong></div><div class="remaining-cell" data-el="remaining-cell"><strong data-el="remaining">3</strong><span data-el="remaining-label">Continues</span></div></div><div class="level-info"><span class="eyebrow" data-el="mode" hidden></span><h1 data-el="level-name"></h1><p data-el="objective" hidden>Keep the last coin for the next round</p></div></div></section>
+      <footer class="play-footer" data-el="footer" hidden><div class="shot-prompt" data-el="shot-prompt"><div class="turn-label" data-el="turn-label" hidden></div><h2 data-el="prompt-title">Line up your shot</h2><p data-el="prompt-description">Drag empty space to aim · Pick a coin to start</p><p class="tutorial-tip" data-el="tutorial-tip" hidden></p></div><p class="best-score" data-el="best-score" hidden>Best: 0</p></footer>
       <div class="status-live" data-el="live" role="status" aria-live="polite" aria-atomic="true"></div>
-      <aside class="notice-toast" data-el="notice" hidden aria-label="Save notice"><p data-el="notice-message" role="status"></p><button type="button" class="notice-dismiss" data-action="dismiss-notice" aria-label="Dismiss save notice">Dismiss</button></aside>
+      <aside class="notice-toast" data-el="notice" hidden aria-label="Progress notification"><p data-el="notice-message" role="status"></p><button type="button" class="notice-dismiss" data-action="dismiss-notice" aria-label="Close notification">Close</button></aside>
       <div class="loading-layer" data-el="loading" hidden><div class="loading-card" role="status"><span class="loading-dot" aria-hidden="true"></span><p data-el="loading-message">Preparing the table</p></div></div>
       <div class="modal-layer" data-el="modal-layer" hidden><section class="result-card" data-el="modal" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-description" tabindex="-1"><div class="bill-seal" data-el="modal-seal" aria-hidden="true">${COIN_ICON}</div><p class="eyebrow" data-el="modal-kicker">This game</p><h2 id="result-title" data-el="modal-title"></h2><p id="result-description" data-el="modal-description"></p><div class="result-score" data-el="modal-score"></div><div class="modal-actions"><button type="button" class="primary-button" data-el="modal-primary" data-action="retry">Try Again</button><button type="button" class="secondary-button" data-el="modal-secondary" data-action="home">Main Menu</button><button type="button" class="text-button" data-el="modal-tertiary" data-action="home" hidden>Main Menu</button></div></section></div>`;
     this.root.append(this.element);
@@ -141,9 +142,9 @@ export class Shell {
       const round = campaign?.round ?? 1;
       this.text('mode', battle ? `First to ${winScore}` : '');
       this.node('mode').hidden = !battle;
-      this.text('level-name', battle ? opening ? 'Opening Flick' : '' : `Round ${round}`);
+      this.text('level-name', battle ? opening ? 'Who Goes First?' : '' : `Round ${round}`);
       this.node('level-name').hidden = battle && !opening;
-      this.text('objective', 'Hit one target: +1 · Miss or foul: switch turns');
+      this.text('objective', 'Clean hit: +1 · Miss or foul: next player');
       this.node('objective').hidden = !battle || opening;
       this.text('best-score', `Best: ${campaign?.bestScore ?? 0}`);
       this.node('best-score').hidden = false;
@@ -162,56 +163,57 @@ export class Shell {
       this.node<HTMLButtonElement>('pause').disabled = ['failed', 'error'].includes(view.phase) || (battle && view.phase === 'complete' && !opening);
       const failedDuringShot = view.phase === 'simulating' && view.foulReasons.length > 0;
       this.node('shot-prompt').dataset.foul = String(failedDuringShot);
-      let title = 'Rotate the view, then flick';
-      let description = 'Drag empty space to rotate; tap a coin to start';
+      let title = 'Line up your shot';
+      let description = 'Drag empty space to aim; pick a coin to start';
       let turn = battle ? currentName === 'You' ? 'Your turn' : `${currentName}'s turn` : '';
       if (view.phase === 'paused') {
-        title = 'Game paused'; description = 'Resume to continue from this table'; turn = 'Taking a break';
+        title = 'Game paused'; description = 'Select Resume to keep playing'; turn = 'Paused';
       } else if (opening && view.phase !== 'error') {
-        title = view.phase === 'complete' ? view.battle!.fallen[view.currentPlayer] ? `${currentName === 'You' ? 'Your' : `${currentName}'s`} coin fell off` : `${currentName} flicked ${openingDistance(view.currentPlayer)}`
-          : computer ? 'Computer is flicking' : 'Opening Flick';
-        description = view.phase === 'simulating' ? 'Wait for the coin to stop before measuring its distance'
-          : view.phase === 'complete' ? view.winner === 0 || view.winner === 1 ? `${view.winner === 0 && view.battle?.variant === 'pve' ? 'You go' : `${playerNames[view.winner]} goes`} first. Setting out nine coins.`
-            : 'Next player. A tie or two fallen coins means another Opening Flick.'
-          : computer ? 'Each player flicks once. The farthest resting coin goes first; falling forfeits.'
-          : 'Hold the finger to charge; release to flick. Farthest goes first; falling forfeits.';
-        turn = `Opening Flick ${view.battle!.openingAttempt} · ${currentName}`;
+        title = view.phase === 'complete' ? view.battle!.fallen[view.currentPlayer] ? 'Shot forfeited' : `${currentName} flicked ${openingDistance(view.currentPlayer)}`
+          : computer ? 'Computer is taking its shot' : 'Who Goes First?';
+        description = view.phase === 'simulating' ? 'Wait for the coin to stop to measure the shot'
+          : view.phase === 'complete' ? view.winner === 0 || view.winner === 1 ? `${view.winner === 0 && view.battle?.variant === 'pve' ? 'You go' : `${playerNames[view.winner]} goes`} first. Setting up nine coins for the match.`
+            : 'Next player. If both shots tie or forfeit, try again.'
+          : computer ? 'The longest shot goes first. Falling off or timing out forfeits the shot.'
+          : 'Hold the finger, then release. Longest shot goes first. A fall or timeout forfeits the shot.';
+        turn = `Opening round ${view.battle!.openingAttempt} · ${currentName}`;
       } else if (view.phase === 'refilling') {
-        title = view.battle?.variant === 'pve' ? 'Adding eight new coins' : 'Refilling to nine coins'; description = 'The table and scores stay. Play resumes when the coins settle.'; turn = 'Setting the table';
+        title = view.battle?.variant === 'pve' ? 'Adding 8 new coins' : 'Refilling to 9 coins'; description = 'Scores and remaining coins carry over. Wait for the new coins to stop.'; turn = 'Setting up';
       } else if (transition === 'clearing' || (challenge && view.phase === 'complete')) {
-        title = 'Keep this coin for the next round'; description = 'Clearing the table for new coins'; turn = 'Round complete';
+        title = 'On to the next round'; description = 'The last coin carries over. New coins are on the way.'; turn = 'Round complete';
       } else if (transition === 'arriving' || introducing) {
-        title = 'Coins are landing';
-        description = view.activeCoinId ? 'Continue from the remaining coin when the new coins settle' : 'Wait for the coins to settle, then tap one to start';
-        turn = 'Setting the table';
+        title = 'New coins are dropping in';
+        description = view.activeCoinId ? 'Your last coin carries over. Wait for the new coins to stop.' : 'Once the coins stop, pick one to start.';
+        turn = 'Setting up';
       } else if (view.phase === 'selecting') {
-        title = computer ? 'Computer is thinking' : 'Tap a coin to start';
-        description = computer ? 'The computer is choosing a coin and planning its shot' : 'Hit exactly one target, then play from that coin. Drag empty space to rotate.';
+        title = computer ? 'Computer is thinking' : 'Pick a coin to start';
+        description = computer ? 'The computer is lining up its next shot' : 'Hit one coin directly for +1, then flick from it. Drag empty space to aim.';
       } else if (view.phase === 'ready') {
-        title = computer ? 'Computer is thinking' : 'Hold the finger to charge';
-        description = computer ? 'The computer is planning its next flick' : view.canSelectCoin
-          ? 'Tap another coin to switch. Hold longer for power; release to flick.'
-          : 'Continue from the coin you hit. Hold longer for power; release to flick.';
+        title = computer ? 'Computer is thinking' : 'Press and hold to charge';
+        description = computer ? 'The computer is lining up its next shot' : view.canSelectCoin
+          ? 'Hold the finger for more power; release to flick. Tap a coin to switch.'
+          : 'Use the coin you just hit. Hold longer for more power; release to flick.';
       } else if (failedDuringShot) {
         title = view.foulReasons.map((reason) => FOUL_TEXT[reason]).join(' · ');
-        description = battle ? 'No point for this shot. The next player takes over when the coins stop.' : 'Wait for the coins to stop to see the result'; turn = 'Foul · Settling';
+        description = battle ? 'No points this time. The next player goes when all coins stop.' : 'Wait for all coins to stop.'; turn = 'Foul · Coins in motion';
+        if (view.foulReasons.includes('MULTI_HIT')) description = `${SECONDARY_HIT_TIP} ${description}`;
       } else if (view.phase === 'simulating') {
-        title = 'Let the coins settle'; description = 'Score and the next active coin are confirmed when all coins stop'; turn = 'Shot in motion';
+        title = 'Wait for the coins to stop'; description = 'The score is counted and play continues once all coins stop.'; turn = 'Shot in motion';
       } else if (view.phase === 'complete') {
-        title = 'Game over'; description = 'Play again and build a longer chain'; turn = 'Chain complete';
+        title = 'Game over'; description = 'Play again to beat your best score'; turn = 'Match complete';
       } else if (view.phase === 'failed') {
         const revives = campaign?.revivesRemaining ?? 3;
-        title = revives > 0 ? `${revives} ${revives === 1 ? 'continue' : 'continues'} left` : 'Run over';
+        title = revives > 0 ? `${revives} ${revives === 1 ? 'continue' : 'continues'} left` : 'Game over';
         description = view.foulReasons.map((reason) => FOUL_TEXT[reason]).join(' · '); turn = 'Chain broken';
       } else if (view.phase === 'error') {
-        title = 'Reset the table'; description = 'Restart or return to the Main Menu'; turn = 'Controls paused';
+        title = 'Something went wrong'; description = 'Restart or return to the Main Menu.'; turn = 'Play paused';
       }
       this.text('turn-label', turn);
       this.node('turn-label').hidden = !turn;
       this.text('prompt-title', title);
       this.text('prompt-description', description);
       const chargeTip = challenge && view.phase === 'ready' && !introducing && !transition && round <= 2 && view.shotCount < 3
-        ? 'At full power, holding for 2 more seconds cancels. Release to reset.'
+        ? 'Release within 2 seconds of full charge, or the shot is canceled.'
         : '';
       const tutorial = challenge && !['paused', 'failed', 'error', 'complete'].includes(view.phase)
         ? [campaign?.tutorial, chargeTip].filter(Boolean).join('\n')
@@ -280,33 +282,35 @@ export class Shell {
       let title = '';
       let description = '';
       let score = '';
-      this.text('modal-kicker', state === 'paused' ? 'Settings' : state === 'error' ? 'Reset the table' : view?.mode === 'battle' ? 'Local Battle · Game Result' : 'Solo Play · Run Result');
+      this.text('modal-kicker', state === 'paused' ? 'Pause Menu' : state === 'error' ? 'Game Error' : view?.mode === 'battle' ? 'Match Results' : 'Run Results');
       if (state !== 'paused') this.button('modal-tertiary', 'Main Menu', 'home', true);
       if (state === 'paused') {
-        title = 'Game Settings';
+        title = 'Paused';
         this.button('modal-primary', 'Resume', 'pause', false, PLAY_ICON);
         this.button('modal-secondary', 'Restart', 'retry', false, RESTART_ICON);
         this.button('modal-tertiary', 'Main Menu', 'home', false, HOME_ICON);
       } else if (state === 'error') {
-        title = 'Reset the table';
-        description = error ?? 'Something went wrong. Restart to prepare the table again.';
+        title = 'Something went wrong';
+        description = error ?? 'Restart the game or return to the Main Menu.';
         this.button('modal-primary', 'Restart', 'retry');
         this.button('modal-secondary', 'Main Menu', 'home');
       } else if (state === 'failed') {
         const revives = this.campaign?.revivesRemaining ?? 3;
         const revive = view?.mode === 'challenge' && revives > 0 && !!this.callbacks.revive;
-        title = revive ? 'Chain broken' : 'Run over';
-        description = view!.foulReasons.map((reason) => FOUL_TEXT[reason]).join('; ') + '. '
-          + (revive ? (view!.foulReasons.includes('FALL') ? 'Fallen coins return. Choose a coin to continue. ' : 'Your table and score stay. Choose a coin to continue. ') + `${revives} ${revives === 1 ? 'continue' : 'continues'} left.` : 'Play again and build a longer chain.');
-        score = `Score: ${this.campaign?.score ?? view!.scores[0]} · Best: ${this.campaign?.bestScore ?? 0}\nRound ${this.campaign?.round ?? 1} reached`;
-        this.button('modal-primary', revive ? 'Continue Run' : 'Play Again', revive ? 'revive' : 'retry');
+        title = revive ? 'Chain broken' : 'Game over';
+        const reasons = view!.foulReasons.map((reason) => FOUL_TEXT[reason]).join('; ');
+        description = (reasons ? `${reasons}. ` : '')
+          + (view!.foulReasons.includes('MULTI_HIT') ? `${SECONDARY_HIT_TIP} ` : '')
+          + (revive ? (view!.foulReasons.includes('FALL') ? 'Fallen coins will return. Keep your score and pick a coin to continue. ' : 'Keep your score and coins. Pick a coin to continue. ') + `${revives} ${revives === 1 ? 'continue' : 'continues'} left.` : 'Play again to beat your best score.');
+        score = `Score: ${this.campaign?.score ?? view!.scores[0]} · Best: ${this.campaign?.bestScore ?? 0}\nReached Round ${this.campaign?.round ?? 1}`;
+        this.button('modal-primary', revive ? 'Continue' : 'Play Again', revive ? 'revive' : 'retry');
         this.button('modal-secondary', revive ? 'Restart' : 'Main Menu', revive ? 'retry' : 'home');
         this.button('modal-tertiary', 'Main Menu', 'home', !revive);
       } else if (view?.mode === 'battle') {
         const names = view.battle?.variant === 'pve' ? ['You', 'Computer'] : ['Player 1', 'Player 2'];
         const winScore = view.battleWinScore ?? 10;
         title = view.winner === 'draw' ? 'Draw' : view.winner === 0 && view.battle?.variant === 'pve' ? 'You win' : `${names[view.winner === 0 ? 0 : 1]} wins`;
-        description = `First to ${winScore} wins. Each valid one-target hit scores a point.`;
+        description = `First to ${winScore} points wins.`;
         score = `${names[0]} ${view.scores[0]}  :  ${view.scores[1]} ${names[1]}`;
         this.button('modal-primary', 'Play Again', 'retry');
         this.button('modal-secondary', 'Main Menu', 'home');

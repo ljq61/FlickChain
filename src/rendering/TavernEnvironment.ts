@@ -7,6 +7,7 @@ const FLOOR_Y = -0.76;
 export class TavernEnvironment extends THREE.Group {
   private readonly geometries = new Set<THREE.BufferGeometry>();
   private readonly materials = new Set<THREE.Material>();
+  private readonly textures = new Set<THREE.Texture>();
   private readonly roomClip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1.1);
   private readonly lampDirection = new THREE.Vector3();
   private readonly lampForward = new THREE.Vector3();
@@ -115,6 +116,7 @@ export class TavernEnvironment extends THREE.Group {
     }
 
     const pendant = this.pendant;
+    pendant.name = 'menu-lamp';
     pendant.position.set(0, 1.58, -0.13);
     // The menu fixture sits in the UI-safe top band, outside the room cutaway.
     const lampBrass = this.brass.clone();
@@ -122,24 +124,51 @@ export class TavernEnvironment extends THREE.Group {
     const lampCord = this.darkWood.clone();
     lampCord.clippingPlanes = null;
     this.materials.add(lampBrass); this.materials.add(lampCord);
-    const shade = new THREE.Mesh(this.geometry(new THREE.LatheGeometry([
-      new THREE.Vector2(0.026, 0.225), new THREE.Vector2(0.085, 0.21), new THREE.Vector2(0.18, 0.155),
-      new THREE.Vector2(0.275, 0.05), new THREE.Vector2(0.3, 0),
-    ], 40)), lampBrass);
-    const interior = this.material(0xd98b31, 0.12, 0.75);
+    const profile = [[0.026, 0.225], [0.085, 0.21], [0.18, 0.155], [0.275, 0.05], [0.3, 0]];
+    // Bottom-to-top winding faces outward. A back-facing inner shell leaves the mouth open.
+    const shadeGeometry = this.geometry(new THREE.LatheGeometry(profile.slice().reverse().map(([radius, y]) => new THREE.Vector2(radius, y)), 40));
+    const shade = new THREE.Mesh(shadeGeometry, lampBrass);
+    shade.name = 'lamp-shade';
+    const interior = this.material(0xffce81, 0.08, 0.75);
     interior.clippingPlanes = null;
-    interior.side = THREE.DoubleSide;
-    interior.emissive.set(0xdd671c);
-    interior.emissiveIntensity = 0.28;
-    const glow = new THREE.Mesh(this.geometry(new THREE.CircleGeometry(0.294, 40)), interior);
-    glow.rotation.x = Math.PI / 2;
-    glow.position.y = 0.002;
+    interior.side = THREE.BackSide;
+    interior.emissive.set(0xffa64d);
+    interior.emissiveIntensity = 0.35;
+    const lining = new THREE.Mesh(shadeGeometry, interior);
+    lining.name = 'lamp-interior';
+    lining.scale.set(0.985, 0.985, 0.985);
     const lip = new THREE.Mesh(this.geometry(new THREE.TorusGeometry(0.3, 0.006, 6, 40)), lampBrass);
+    lip.name = 'lamp-lip';
     lip.rotation.x = Math.PI / 2;
-    const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xfff0c2 });
+    const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffefc1, toneMapped: false });
     this.materials.add(bulbMaterial);
-    const bulb = new THREE.Mesh(this.geometry(new THREE.SphereGeometry(0.045, 12, 8)), bulbMaterial);
-    bulb.position.y = -0.026;
+    const bulb = new THREE.Mesh(this.geometry(new THREE.SphereGeometry(0.055, 24, 16)), bulbMaterial);
+    bulb.name = 'lamp-bulb';
+    // The menu camera sees the fixture from above: the globe must clear the near lip.
+    bulb.position.y = -0.195;
+    bulb.scale.y = 1.16;
+    const holder = new THREE.Mesh(cylinder, lampCord);
+    holder.name = 'lamp-bulb-holder';
+    holder.position.y = -0.05;
+    holder.scale.set(0.018, 0.2, 0.018);
+    // One small local sprite softens the globe edge, without a bloom pass or another light.
+    const glowPixels = new Uint8Array(32 * 32 * 4);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const radius = Math.hypot((x + 0.5 - 16) / 16, (y + 0.5 - 16) / 16);
+      const offset = (y * 32 + x) * 4;
+      glowPixels[offset] = glowPixels[offset + 1] = glowPixels[offset + 2] = 255;
+      glowPixels[offset + 3] = Math.round(255 * Math.pow(Math.max(0, 1 - radius * radius), 2));
+    }
+    const glowTexture = new THREE.DataTexture(glowPixels, 32, 32);
+    glowTexture.magFilter = glowTexture.minFilter = THREE.LinearFilter;
+    glowTexture.needsUpdate = true;
+    this.textures.add(glowTexture);
+    const glowMaterial = new THREE.SpriteMaterial({ map: glowTexture, color: 0xffba63, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+    this.materials.add(glowMaterial);
+    const glow = new THREE.Sprite(glowMaterial);
+    glow.name = 'lamp-bulb-glow';
+    glow.position.copy(bulb.position);
+    glow.scale.set(0.15, 0.15, 1);
     const cord = new THREE.Mesh(cylinder, lampCord);
     cord.position.y = 1.1;
     cord.scale.set(0.007, 1.75, 0.007);
@@ -147,7 +176,6 @@ export class TavernEnvironment extends THREE.Group {
     socket.position.y = 0.258;
     socket.scale.set(0.032, 0.07, 0.032);
     const ribs: number[] = [];
-    const profile = [[0.026, 0.225], [0.085, 0.21], [0.18, 0.155], [0.275, 0.05], [0.3, 0]];
     for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) for (let index = 1; index < profile.length; index++) {
       for (const [radius, y] of [profile[index - 1], profile[index]]) ribs.push((radius + 0.001) * Math.cos(angle), y + 0.001, (radius + 0.001) * Math.sin(angle));
     }
@@ -155,7 +183,7 @@ export class TavernEnvironment extends THREE.Group {
     ribGeometry.setAttribute('position', new THREE.Float32BufferAttribute(ribs, 3));
     const ribMaterial = new THREE.LineBasicMaterial({ color: 0x70471f });
     this.materials.add(ribMaterial);
-    pendant.add(shade, glow, lip, bulb, cord, socket, new THREE.LineSegments(ribGeometry, ribMaterial));
+    pendant.add(shade, lining, lip, bulb, holder, glow, cord, socket, new THREE.LineSegments(ribGeometry, ribMaterial));
     pendant.traverse((object) => { object.raycast = () => {}; });
     this.add(pendant, this.tableDress);
 
@@ -195,14 +223,16 @@ export class TavernEnvironment extends THREE.Group {
   /** A small 3D menu fixture stays above the title, regardless of viewport. */
   presentMenuLamp(camera: THREE.PerspectiveCamera, width: number, height: number, centerX: number): void {
     const compactPortrait = width < height && height < 700;
-    const centerY = compactPortrait ? 0.08 : 0.085;
+    const shortLandscape = width > height && height < 600;
+    const centerY = shortLandscape ? 0.06 : compactPortrait ? 0.08 : 0.085;
     this.lampDirection.set(centerX * 2 - 1, 1 - centerY * 2, 0.5).unproject(camera).sub(camera.position).normalize();
     const distance = Math.max(1, camera.position.length() * 0.65);
     this.pendant.position.copy(camera.position).addScaledVector(this.lampDirection, distance);
     camera.getWorldDirection(this.lampForward);
     const depth = distance * this.lampDirection.dot(this.lampForward);
     const pixelScale = 2 * depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / height;
-    this.pendant.scale.setScalar(Math.min(126, width * (compactPortrait ? 0.2 : 0.26), height * 0.2) * pixelScale / 0.6);
+    const heightBudget = shortLandscape ? 0.14 : 0.15;
+    this.pendant.scale.setScalar(Math.min(126, width * (compactPortrait ? 0.18 : 0.26), height * heightBudget) * pixelScale / 0.6);
   }
 
   /** Trims sit inside the authoritative footprint and never resize its surface. */
@@ -255,6 +285,7 @@ export class TavernEnvironment extends THREE.Group {
     this.geometries.forEach((geometry) => geometry.dispose());
     this.tableGeometries.forEach((geometry) => geometry.dispose());
     this.materials.forEach((material) => material.dispose());
+    this.textures.forEach((texture) => texture.dispose());
     this.clear();
   }
 }

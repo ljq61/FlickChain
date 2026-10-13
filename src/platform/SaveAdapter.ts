@@ -19,7 +19,7 @@ export class SaveAdapter {
       this.storage = storage === undefined ? globalThis.localStorage ?? null : storage;
     } catch {
       this.storage = null;
-      this.lastError = 'Your browser blocked progress saving. You can still play.';
+      this.lastError = 'Your browser blocked saving. You can keep playing.';
     }
   }
 
@@ -40,7 +40,7 @@ export class SaveAdapter {
         bestScore: safeScore(data.bestScore),
       };
     } catch {
-      this.lastError = 'Saved progress could not be read. Default settings restored.';
+      this.lastError = 'Saved progress could not be loaded. Using default settings.';
       return { schemaVersion: 1, completed: [], sound: true, bestScore: 0 };
     }
   }

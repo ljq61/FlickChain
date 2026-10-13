@@ -1,0 +1,93 @@
+{
+  "created": "2026-10-13",
+  "branch": "dev_en",
+  "baseline": "af620da3dabe14c4846a61a8de0098c9610bed8e",
+  "source": "dev_en release candidate working tree",
+  "archive": "FlickChain-dev-en-2026-10-13.zip",
+  "archiveBytes": 3703322,
+  "archiveSha256": "7b4a43901086fb72dd8338c70f9a5d6c5d76378d0f77456cbf110c6f9493734d",
+  "expandedBytes": 7236519.0,
+  "fileCount": 16,
+  "files": [
+    {
+      "path": "assets/BattleWorker-BIf1budl.js",
+      "bytes": 2270379,
+      "sha256": "c1eef7928346f513a03f8b41f7b93a76b62308677feade652aee5594e29de155"
+    },
+    {
+      "path": "assets/index-C6U0Zj8f.css",
+      "bytes": 21741,
+      "sha256": "c7e0afea72120bbc91249569367d82cebb57389401c3e36d73cdbef3ffa38b53"
+    },
+    {
+      "path": "assets/index-HpfZuaae.js",
+      "bytes": 2972935,
+      "sha256": "416e3b05b1345c27cbb057b134bfadff6c3168a5177dcda1fa9bd522446337e8"
+    },
+    {
+      "path": "audio/coin-hit-a.wav",
+      "bytes": 20330,
+      "sha256": "fe8b8206b8b765f9c4fe70c2db5f467ec0b1f537440683a1db8d094bda64959c"
+    },
+    {
+      "path": "audio/coin-hit-b.wav",
+      "bytes": 20330,
+      "sha256": "cce6f1b8e99dae934015e13387bcd62ba1005087b3e093f4d36b4108e77c6828"
+    },
+    {
+      "path": "audio/coin-land.wav",
+      "bytes": 52082,
+      "sha256": "5ec416275ca59f42870d5fc9ec80b059f141bfd8dcc69990c1cab5c5c4c52592"
+    },
+    {
+      "path": "audio/coin-wood.wav",
+      "bytes": 9746,
+      "sha256": "3f723e20d45dc660cf8677e155f805419a9edebddec885e12aa1862ed2ed4156"
+    },
+    {
+      "path": "audio/midnight-jazz.mp3",
+      "bytes": 466277,
+      "sha256": "8e1be43fea4611b7ad499da9cc9cc2406c07ae4819efab39a820ae385a493712"
+    },
+    {
+      "path": "branding/flickchain-logo.png",
+      "bytes": 1292898,
+      "sha256": "33ab75705b78651acbf066285baa11f28f358b76e92956b2b1d0ceb05d6e5c00"
+    },
+    {
+      "path": "levels/01-first-flick.json",
+      "bytes": 495,
+      "sha256": "5d778e802c8966d4c9f81388a9de1bf1abb2f50512256c3d6090277d4eb66ff1"
+    },
+    {
+      "path": "levels/02-distance.json",
+      "bytes": 466,
+      "sha256": "f6b39b6712c985265c6f83e098a885ac1e7c44ed55e8077e6fd8656bf7e11d85"
+    },
+    {
+      "path": "levels/03-turn-the-corner.json",
+      "bytes": 549,
+      "sha256": "f90aa64125a29f1c3efd58920e4026290fc15af3f06e875ccb30888457345388"
+    },
+    {
+      "path": "levels/04-zigzag.json",
+      "bytes": 611,
+      "sha256": "50351dbe077639a6198fa0a6f5ea1fb1e44b43f772b7bf92ee39f6bea47678c7"
+    },
+    {
+      "path": "levels/05-full-chain.json",
+      "bytes": 685,
+      "sha256": "1ccf4af69798b2949ed9d619dcf9b49730b167cee7ab0ef7deca481e69ff6c7b"
+    },
+    {
+      "path": "models/flick-hand.glb",
+      "bytes": 106380,
+      "sha256": "a5d027e6381b2c3ca303b06a86d249f42e06c3a619b1d707ed0f2cb5d6f7b028"
+    },
+    {
+      "path": "index.html",
+      "bytes": 615,
+      "sha256": "ea7ced81757779bcad05b9b2ed0f814fb6908b90b273034df953286c5cbcca0b"
+    }
+  ]
+}

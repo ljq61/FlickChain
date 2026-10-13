@@ -207,12 +207,12 @@ export class SceneManager {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.localClippingEnabled = true;
     this.canvas.className = 'game-canvas';
-    this.canvas.setAttribute('aria-label', '3D tabletop. Drag an empty area to rotate the view. Select a coin, then hold the finger behind it to charge and release to flick.');
+    this.canvas.setAttribute('aria-label', 'Game table. Drag empty space to aim. Pick a coin, then press and hold the finger behind it. Release to flick.');
     this.host.append(this.canvas);
     this.chargeMeter.className = 'charge-meter';
     this.chargeMeter.hidden = true;
     this.chargeMeter.setAttribute('role', 'progressbar');
-    this.chargeMeter.setAttribute('aria-label', 'Flick power');
+    this.chargeMeter.setAttribute('aria-label', 'Shot power');
     this.chargeMeter.setAttribute('aria-valuemin', '0');
     this.chargeMeter.setAttribute('aria-valuemax', '100');
     this.chargeMeter.setAttribute('aria-valuenow', '0');

@@ -1,0 +1,46 @@
+{
+  "created": "2026-10-13",
+  "generator": "built-in ImageGen",
+  "safeAreaBasis": "User-requested reserve: 35% of width and 25% of height",
+  "files": [
+    {
+      "file": "FlickChain-landscape-1920x1080.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 3113388,
+      "sha256": "62b50d6d1d3f38b18c14fc8f81ccd19ebf2fb96c662bb4c2d3e6cd8550bd3191",
+      "safeArea": {
+        "x": 0,
+        "y": 0,
+        "width": 672,
+        "height": 270
+      }
+    },
+    {
+      "file": "FlickChain-portrait-800x1200.png",
+      "width": 800,
+      "height": 1200,
+      "bytes": 1727664,
+      "sha256": "aafbead27d9c717a97ed8ff3d9f123856eb9d0ed646c8dfcfd4e7b76dda50789",
+      "safeArea": {
+        "x": 0,
+        "y": 0,
+        "width": 280,
+        "height": 300
+      }
+    },
+    {
+      "file": "FlickChain-square-800x800.png",
+      "width": 800,
+      "height": 800,
+      "bytes": 1236162,
+      "sha256": "2597ad29565c91c0ac2d3afab906857ef7246ccc3d36889727a948fbf0b826c1",
+      "safeArea": {
+        "x": 0,
+        "y": 0,
+        "width": 280,
+        "height": 200
+      }
+    }
+  ]
+}

@@ -72,7 +72,8 @@ src/
   rendering/                    场景、相机、Mesh、光影、插值
   input/                        Pointer 手势、桌面投影、输入取消
   ui/                           菜单、HUD、模式提示、结果与无障碍
-  platform/SaveAdapter.ts        本地进度、设置、迁移；后期平台适配
+  platform/SaveAdapter.ts        本地进度、设置与迁移
+  platform/CrazyGamesAdapter.ts  SDK v3加载、生命周期、平台静音与离线降级
 public/                         静态资源；不保存运行状态
 tests/                          纯规则、生产物理回归、生命周期测试
 ```
@@ -341,7 +342,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 | 模拟触摸 | pointer 多指、滚动干扰、pointercancel、安全区 | 浏览器模拟触摸，不证明真机 |
 | 真实手机 | 手感、画面清晰度、60/120 比较、长帧、后台、温升与内存 | 被测设备的体验／性能 |
 | 静态发布 | build、WASM／Worker 路径、资源缓存版本、部署页面、浏览器冷启动 | 实际部署站点 |
-| CrazyGames | 后期 SDK、Preview、平台交互与平台验收 | Preview 与正式发布分别留证 |
+| CrazyGames | SDK本地模式、Developer Portal Preview、平台交互与平台验收 | 本地生命周期证据、Preview 与正式发布分别留证 |
 
 对规则与生产物理使用有意义的定向回归，不写仅复述接口字段的测试。UI 必须实际浏览器交互，CSS 或回调检查不能替代可见画面与命中区验收。文档审查仅证明设计一致性；已完成的自动化、本地与公开站点证据以PROGRESS.md和Actions为准；真机与CrazyGames验收仍需单独执行。
 
@@ -354,7 +355,7 @@ GameApp 是生命周期根。每个模块提供可重复调用的 dispose／canc
 5. **Content**：材质调校、随机轮全链体验与回归、视觉／音频／真机打磨。
 6. **Publish**：刷新平台文档与限制、SDK、静态包、上线与平台验收。
 
-发布前再查 CrazyGames 当前 SDK 和上传要求，不在本文硬写可能过期的包大小、素材尺寸或广告门槛。SDK 通过平台适配接入，不污染 ShotResolver；暂停／广告等平台事件须走同一生命周期入口。生成本地包、部署可访问、CrazyGames Preview 可玩和正式平台发布是四个不同结论。网络对战若未来获批，需另写同步／恢复／安全架构，当前不承诺以快照直接完成联网。
+发布前刷新 CrazyGames 当前 SDK 和上传要求，不在本文硬写可能过期的包大小、素材尺寸或广告门槛。SDK v3 已通过平台适配器接入，不污染 ShotResolver；loading、gameplay 与平台静音走统一应用生命周期，广告/账号/数据 API 尚未接入。生成本地包、SDK本地模式可用、CrazyGames Preview 可玩和正式平台发布是不同结论。网络对战若未来获批，需另写同步／恢复／安全架构，当前不承诺以快照直接完成联网。
 
 ## 13. 待定项与主要风险
 

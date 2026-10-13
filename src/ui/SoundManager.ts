@@ -44,6 +44,11 @@ export class SoundManager {
     }
   }
 
+  /** Platform unmute may resume a context already unlocked by a user gesture. */
+  resumeIfUnlocked(): void {
+    if (this.context) this.unlock();
+  }
+
   play(kind: SoundKind, intensity = 1): void {
     if (!this.ready()) return;
     const strength = this.clamp(intensity);

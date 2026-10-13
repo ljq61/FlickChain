@@ -4,13 +4,13 @@
 
 [在线游玩](https://ljq61.github.io/FlickChain/) · [开发进度与验证记录](docs/PROGRESS.md)
 
-当前状态（2026-10-12）：昏暗酒馆、聚光圆桌与厚底威士忌杯；单人连续随机闯关，本地对战支持 PVP/PVE，双方先得 10 分获胜。PVE 默认采用更轻松的电脑策略。选中硬币已取消外围光圈，保留手指、币面细微亮度与蓄力条提示。
+当前状态（2026-10-13）：`dev_en` 为英文发行分支；昏暗酒馆、可见发光灯泡、聚光圆桌与厚底威士忌杯已完成。单人连续随机闯关和本地 PVP/PVE 均可玩，双方先得 10 分获胜；PVE 默认采用更轻松的电脑策略。CrazyGames SDK v3 已接入加载与游戏生命周期，英文上传包、提交文案及三种封面尺寸已准备。
 
 - 单人每轮继承最后存活币的真实位置，新币避让后轻落桌；整次闯关有 3 次复活，保留残局与累计分，掉落则补回同数量金币，本地记录最高分。
 - 对战先弹金币比远争先，再在随机木/大理石桌、9 枚混合硬币与 1–5 个酒杯的棋盘上接力，失误换手。
-- 最近完整自动化回归 335 项通过、1 项可选测试跳过；去除光圈相关渲染/输入回归 46 项通过。类型检查、生产构建、桌面与手机尺寸浏览器及公开 Pages 实测见 [开发进度](docs/PROGRESS.md)。
+- 最近完整自动化回归 383 项通过、1 项可选测试跳过；类型检查、生产构建、桌面与手机尺寸浏览器及 CrazyGames 本地 SDK 生命周期实测见 [开发进度](docs/PROGRESS.md)。
 
-随机轮配方、继承/复活、材质与旧固定布局解法分别回归，不承诺所有随机布局完整可解。真实手机触摸与性能尚未验收，平台排行榜和广告复活尚未接入。
+随机轮配方、继承/复活、材质与旧固定布局解法分别回归，不承诺所有随机布局完整可解。真实手机触摸与性能、CrazyGames Developer Portal Preview 和正式发布尚未验收；平台排行榜和广告复活未接入。
 
 ## 本地运行
 
@@ -68,7 +68,7 @@ PVE默认为更轻松的电脑对手：使用Worker复制生产Rapier快照，�
 
 [发布工作流](.github/workflows/deploy-pages.yml) 在 main 推送后执行 npm ci、完整测试和生产构建，仅将 dist 上传到 Pages；也支持手动重跑。仓库 Pages 来源应设为 GitHub Actions。实际发布结果与提交版本见 [Actions](https://github.com/ljq61/FlickChain/actions/workflows/deploy-pages.yml)。构建使用相对基址，模型、MP3 和独立 AI Worker 从游戏子路径加载；Rapier 兼容版 WASM 随脚本打包。
 
-GitHub Pages 是本轮公开静态站点交付；CrazyGames SDK、Preview 与正式平台提交仍未执行。
+GitHub Pages 是当前公开静态站点交付。`dev_en` 已完成 CrazyGames SDK v3 生命周期适配及 Basic Launch 本地包；Developer Portal Preview、预览视频和正式平台提交仍未执行。提交材料见 [CrazyGames 上传清单](artifacts/crazygames/UPLOAD-CHECKLIST.md)。
 
 ## 项目文档
 

@@ -1,8 +1,8 @@
 # FlickChain 任务计划 V0.7
 
-日期：2026-10-11｜feature：flickchain-web-3d｜模式：完整规划｜状态：active（连续随机单人/本地对战、用户动画手与圆桌已实现，设备与阶段出口验收待完成）
+日期：2026-10-13｜feature：flickchain-web-3d｜模式：完整规划｜状态：active（连续随机单人/本地对战、英文发行适配、用户动画手、圆桌及 CrazyGames SDK 本地集成已实现；Portal Preview、真机与阶段出口验收待完成）
 
-当前进度以 [PROGRESS.md](PROGRESS.md) 为准。单人改为连续随机轮，无选关；继承刚体、三次复活、最高分、铁币/大理石/玻璃杯已接入。最新验证见PROGRESS；旧五布局完整解仅保留生产回归。原20固定关计划被随机轮体验验证取代。Worker AI已接入；真机/性能、排行榜、广告复活与CrazyGames发行暂未完成；本轮新增main自动构建与GitHub Pages发布。
+当前进度以 [PROGRESS.md](PROGRESS.md) 为准。单人改为连续随机轮，无选关；继承刚体、三次复活、最高分、铁币/大理石/玻璃杯已接入。最新验证见PROGRESS；旧五布局完整解仅保留生产回归。原20固定关计划被随机轮体验验证取代。Worker AI已接入；`dev_en` 已完成英文运行文本、CrazyGames SDK v3 生命周期、Basic Launch 本地上传包及三张封面。真机/性能、预览视频、Developer Portal Preview、排行榜、广告复活与正式发行仍未完成。
 
 2026-10-10 交互迭代完成：点币即时开始、弹射前可切换当前币、按住手指按时长蓄力、金币表现与金属感音效；单测与真 GPU 浏览器验证全绿，见 [交互 v2 验证记录](validation/2026-10-10-interaction-v2.md)。
 

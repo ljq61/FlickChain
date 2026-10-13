@@ -2,6 +2,8 @@
 
 Status: English distribution and selected viewport checks passed. This record covers localization and layout; it is not a CrazyGames platform approval or full release certification.
 
+> Historical scope note: this 2026-10-12 record predates the SDK integration and final submission covers. Current CrazyGames preparation status and evidence are in [`artifacts/crazygames/qa-2026-10-13/README.md`](../../../artifacts/crazygames/qa-2026-10-13/README.md) and [`artifacts/crazygames/UPLOAD-CHECKLIST.md`](../../../artifacts/crazygames/UPLOAD-CHECKLIST.md).
+
 ## Implemented
 
 All shipped interface copy, tutorial text, dynamic player/round labels, results, continue/restart/settings controls, storage notices, startup/recovery errors, AI/physics diagnostics, accessible labels, page title/description and level names/lessons are English. The document declares lang=en. The branch has one English locale and no language selector. The accepted Tavern Letterpress logo is retained.
@@ -18,7 +20,7 @@ Official sources were read on 2026-10-12:
 - [Technical requirements](https://docs.crazygames.com/requirements/technical/): relative bundle paths, file/download limits, optional SDK for Basic implementation versus mandatory integration for Full implementation.
 - [Quality guidance](https://docs.crazygames.com/requirements/quality/): clear controls, concise onboarding and immediately understandable actions.
 
-English-only distribution uses English irrespective of browser language. Locale-based selection/fallback is relevant if additional translations are introduced. No SDK was added to this language-focused change. Solo Play reaches the game with one menu click. Existing secondary PVP/PVE menu remains; this record does not claim Full implementation acceptance. Runtime checks found no external promotional links or custom fullscreen control.
+English-only distribution uses English irrespective of browser language. Locale-based selection/fallback is relevant if additional translations are introduced. This language-focused validation did not include the SDK, which was added and separately verified on 2026-10-13. Solo Play reaches the game with one menu click. Existing secondary PVP/PVE menu remains; this record does not claim Full implementation acceptance. Runtime checks found no external promotional links or custom fullscreen control.
 
 ## Automated validation
 

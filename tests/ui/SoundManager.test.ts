@@ -67,12 +67,26 @@ describe('SoundManager optional audio and voice lifecycle', () => {
   afterEach(() => { sound.dispose(); vi.unstubAllGlobals(); });
 
   it('does not allocate audio or fetch samples before a permitted user unlock', () => {
+    sound.resumeIfUnlocked();
     sound.slide(1);
     sound.play('land');
     sound.enabled = false;
     sound.unlock();
     expect(Context.instances).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('resumes an already-unlocked context after platform mute without replaying old sounds', async () => {
+    sound.unlock(); await loaded();
+    sound.enabled = false; sound.suspend();
+    expect(context().state).toBe('suspended');
+    sound.enabled = true; sound.resumeIfUnlocked();
+    expect(context().state).toBe('running');
+    expect(context().resume).toHaveBeenCalledTimes(2);
+    expect(context().sources).toHaveLength(0);
+    sound.play('land');
+    expect(context().sources).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it('loads and decodes once per context, reuses recorded land sounds after resume', async () => {

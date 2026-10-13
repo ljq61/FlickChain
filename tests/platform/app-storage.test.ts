@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameApp } from '../../src/app/GameApp';
 import { LEVELS } from '../../src/content/levels';
+import type { GamePlatform } from '../../src/platform/CrazyGamesAdapter';
 import type { AiShot } from '../../src/ai/AIClient';
 import type { SessionSnapshot } from '../../src/core/GameSession';
 import type { BattleVariant, BattleWinScore, CoinTransform, GameMode, GameView, LevelConfig, WorldFrame } from '../../src/types/contracts';
@@ -19,7 +20,7 @@ const harness = vi.hoisted(() => ({
   handLoad: vi.fn(async () => {}),
   inputState: null as null | (() => { view: GameView | null; frame: WorldFrame | null }),
   inputCallbacks: null as null | { pickCoin: (id: string) => void; shoot: (direction: { x: number; z: number }, power: number) => void },
-  play: vi.fn(), stopSounds: vi.fn(), suspendSound: vi.fn(), arrivals: [] as string[][],
+  play: vi.fn(), stopSounds: vi.fn(), suspendSound: vi.fn(), resumeSound: vi.fn(), arrivals: [] as string[][],
 }));
 
 // App, Shell, generator and storage remain real. Physics and renderer are tested separately.
@@ -127,13 +128,21 @@ vi.mock('../../src/input/PointerInput', () => ({ PointerInput: class {
   cancel = vi.fn(); dispose = vi.fn(); charge = vi.fn(() => null);
 } }));
 vi.mock('../../src/ui/SoundManager', () => ({ SoundManager: class {
-  enabled = true; unlock = vi.fn(); play = harness.play; slide = vi.fn(); stopCurrentSounds = harness.stopSounds; suspend = harness.suspendSound; dispose = vi.fn();
+  enabled = true; unlock = vi.fn(); resumeIfUnlocked = harness.resumeSound; play = harness.play; slide = vi.fn(); stopCurrentSounds = harness.stopSounds; suspend = harness.suspendSound; dispose = vi.fn();
 } }));
 
 describe('continuous Challenge app and persistence', () => {
   let root: HTMLDivElement; let app: GameApp | undefined; let raf: FrameRequestCallback | undefined; let time: number;
   let storage: { getItem: ReturnType<typeof vi.fn>; setItem: ReturnType<typeof vi.fn> };
+  let platform: GamePlatform;
+  let muted: boolean;
+  let muteListener: ((muted: boolean) => void) | undefined;
   beforeEach(() => {
+    muted = false; muteListener = undefined;
+    platform = { initialize: vi.fn(async () => {}), setGameplay: vi.fn(), setLoading: vi.fn(),
+      get muted() { return muted; },
+      onMuteChange: listener => { muteListener = listener; listener(muted); return () => { muteListener = undefined; }; },
+      dispose: vi.fn() };
     harness.sessions.length = 0; harness.creations.length = 0; harness.openings.length = 0; harness.aiRequests.length = 0;
     harness.arrivals.length = 0; harness.inputState = null; harness.inputCallbacks = null;
     harness.handLoad.mockReset().mockResolvedValue(undefined);
@@ -152,7 +161,7 @@ describe('continuous Challenge app and persistence', () => {
     for (let i = 0; i < count; i++) { const callback = raf!; expect(callback).toBeDefined(); raf = undefined; callback(time += 16); }
   }
   async function initialize(): Promise<void> {
-    app = new GameApp(root, () => 0.5); await app.initialize();
+    app = new GameApp(root, () => 0.5, platform); await app.initialize();
     expect(node('[data-el="loading"]').hidden).toBe(true);
   }
   async function start(): Promise<void> {
@@ -199,6 +208,81 @@ describe('continuous Challenge app and persistence', () => {
     expect(harness.suspendSound).toHaveBeenCalledTimes(2);
     expect(harness.sessions.at(-1)!.view.phase).toBe('paused');
     hidden.mockRestore();
+  });
+
+  it('reports loading and real play, pause, resume and failure without starting in the menu or arrival animation', async () => {
+    await initialize(); frames();
+    expect(platform.initialize).toHaveBeenCalledOnce();
+    expect(platform.setLoading).toHaveBeenLastCalledWith(false);
+    expect(platform.setGameplay).not.toHaveBeenCalledWith(true);
+    await start(); frames();
+    expect(platform.setGameplay).not.toHaveBeenCalledWith(true);
+    frames(90);
+    expect(platform.setGameplay).toHaveBeenLastCalledWith(true);
+    node<HTMLButtonElement>('[data-action="pause"]').click(); frames();
+    expect(platform.setGameplay).toHaveBeenLastCalledWith(false);
+    node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames();
+    expect(platform.setGameplay).toHaveBeenLastCalledWith(true);
+    fail();
+    expect(platform.setGameplay).toHaveBeenLastCalledWith(false);
+    node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames(90);
+    expect(platform.setGameplay).toHaveBeenLastCalledWith(true);
+    node<HTMLButtonElement>('[data-action="pause"]').click(); frames();
+    node<HTMLButtonElement>('[data-action="home"]').click();
+    await vi.waitFor(() => expect(node('.flick-shell').dataset.screen).toBe('home'));
+    frames();
+    expect(platform.setGameplay).toHaveBeenLastCalledWith(false);
+  });
+
+  it('does not send gameplay events just because the browser loses visibility', async () => {
+    await initialize(); await start(); frames(90);
+    const sent = vi.mocked(platform.setGameplay).mock.calls.length;
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    document.dispatchEvent(new Event('visibilitychange')); frames(5);
+    expect(platform.setGameplay).toHaveBeenCalledTimes(sent);
+    hidden.mockReturnValue(false); frames();
+    expect(platform.setGameplay).toHaveBeenLastCalledWith(false); // The actual pause screen is now visible.
+    hidden.mockRestore();
+  });
+
+  it('honors portal mute over sound toggles while retaining the local preference', async () => {
+    await initialize();
+    muted = true; muteListener!(true);
+    expect(node('[data-el="sound"]').getAttribute('aria-pressed')).toBe('false');
+    node<HTMLButtonElement>('[data-el="sound"]').click();
+    node<HTMLButtonElement>('[data-el="sound"]').click();
+    expect(JSON.parse(storage.setItem.mock.calls.at(-1)![1]).sound).toBe(true);
+    expect(node('[data-el="sound"]').getAttribute('aria-pressed')).toBe('false');
+    muted = false; muteListener!(false);
+    expect(node('[data-el="sound"]').getAttribute('aria-pressed')).toBe('true');
+    expect(harness.resumeSound).toHaveBeenLastCalledWith();
+  });
+
+  it('does not resume sound on portal unmute while paused, hidden or locally muted', async () => {
+    await initialize(); await start(); frames(90);
+    node<HTMLButtonElement>('[data-action="pause"]').click(); frames();
+    harness.resumeSound.mockClear();
+    muted = true; muteListener!(true); muted = false; muteListener!(false);
+    expect(harness.resumeSound).not.toHaveBeenCalled();
+    node<HTMLButtonElement>('[data-el="modal-primary"]').click(); frames();
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    muted = true; muteListener!(true); muted = false; muteListener!(false);
+    expect(harness.resumeSound).not.toHaveBeenCalled(); hidden.mockRestore();
+    node<HTMLButtonElement>('[data-el="sound"]').click();
+    muted = true; muteListener!(true); muted = false; muteListener!(false);
+    expect(harness.resumeSound).not.toHaveBeenCalled();
+  });
+
+  it('disposes during SDK initialization without loading or reviving the app later', async () => {
+    let finish!: () => void;
+    vi.mocked(platform.initialize).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    app = new GameApp(root, () => 0.5, platform);
+    const initialized = app.initialize();
+    app.dispose(); finish(); await initialized;
+    expect(platform.dispose).toHaveBeenCalledOnce();
+    expect(muteListener).toBeUndefined();
+    expect(harness.handLoad).not.toHaveBeenCalled();
+    expect(harness.sessions).toHaveLength(0);
   });
 
   it('automatically carries the last coin and score into seven coins without a success modal or next click', async () => {
@@ -301,7 +385,7 @@ describe('continuous Challenge app and persistence', () => {
   it.each(['boot', 'entry'] as const)('retries a failed hand load at %s without leaving a stale loading gate', async (stage) => {
     if (stage === 'entry') await initialize();
     harness.handLoad.mockRejectedValueOnce(new Error('Hand model request failed (503)'));
-    if (stage === 'boot') { app = new GameApp(root); await app.initialize(); }
+    if (stage === 'boot') { app = new GameApp(root, Math.random, platform); await app.initialize(); }
     else node<HTMLButtonElement>('[data-action="challenge"]').click();
     await vi.waitFor(() => expect(node('[data-el="modal-description"]').textContent).toContain('503'));
     const count = harness.handLoad.mock.calls.length;
@@ -550,7 +634,7 @@ describe('continuous Challenge app and persistence', () => {
       session.view = { ...session.view, phase: 'selecting', currentPlayer: 0, activeCoinId: null, canSelectCoin: true, revision: session.view.revision + 1 };
       frames();
       expect(harness.inputState!().view).toMatchObject({ inputOwner: 'human', currentPlayer: 0, canSelectCoin: true });
-      expect(node('[data-el="prompt-title"]').textContent).toBe('Tap a coin to start');
+      expect(node('[data-el="prompt-title"]').textContent).toBe('Pick a coin to start');
     });
 
     it.each(['pause', 'home', 'restart', 'dispose'] as const)('%s cancels a pending computer result so the old turn never shoots', async action => {

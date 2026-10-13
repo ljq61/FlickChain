@@ -7,6 +7,7 @@ import { GameSession } from '../core/GameSession';
 import { PointerInput, chargePower } from '../input/PointerInput';
 import { BrowserGestureGuard } from '../input/BrowserGestureGuard';
 import { SaveAdapter, type SaveData } from '../platform/SaveAdapter';
+import { CrazyGamesAdapter, type GamePlatform } from '../platform/CrazyGamesAdapter';
 import { SceneManager } from '../rendering/SceneManager';
 import { Shell } from '../ui/Shell';
 import { SoundManager } from '../ui/SoundManager';
@@ -41,6 +42,7 @@ export class GameApp {
   private readonly scene: SceneManager;
   private readonly pointer: PointerInput;
   private readonly browserGestures: BrowserGestureGuard;
+  private readonly removePlatformMuteListener: () => void;
   private session: GameSession | null = null;
   private opening: OpeningSession | null = null;
   private battle: BattleRun | null = null;
@@ -75,8 +77,9 @@ export class GameApp {
   private run: CampaignRun | null = null;
   private lastLoad: { mode: GameMode; level: LevelConfig; menu: boolean } | null = null;
 
-  constructor(root: HTMLElement, private readonly random: () => number = Math.random) {
-    this.sound.enabled = this.progress.sound;
+  constructor(root: HTMLElement, private readonly random: () => number = Math.random,
+    private readonly platform: GamePlatform = new CrazyGamesAdapter()) {
+    this.sound.enabled = this.progress.sound && !this.platform.muted;
     this.shell = new Shell(root, LEVELS, {
       start: (mode, levelId, variant) => { void this.start(mode, levelId, variant); },
       retry: () => { void this.retry(); },
@@ -96,6 +99,12 @@ export class GameApp {
       chargeFailed: () => this.sound.play('charge-failed'),
     });
     this.browserGestures = new BrowserGestureGuard(root);
+    this.removePlatformMuteListener = this.platform.onMuteChange(muted => {
+      this.sound.enabled = this.progress.sound && !muted;
+      if (!this.sound.enabled) this.sound.suspend();
+      else if (!document.hidden && this.gameView?.phase !== 'paused') this.sound.resumeIfUnlocked();
+      this.renderShell();
+    });
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('pagehide', this.onPageHide);
     this.renderShell();
@@ -103,6 +112,11 @@ export class GameApp {
   }
 
   async initialize(): Promise<void> {
+    this.loading = true;
+    this.shell.setLoading('Loading...');
+    this.platform.setLoading(true);
+    await this.platform.initialize();
+    if (this.disposed) return;
     await this.load('challenge', LEVELS[0], true);
   }
 
@@ -111,6 +125,8 @@ export class GameApp {
     this.lastLoad = { mode, level: structuredClone(level), menu };
     const generation = ++this.generation;
     this.loading = true;
+    this.platform.setGameplay(false);
+    this.platform.setLoading(true);
     this.pointer.cancel();
     this.scene.clearFocus();
     this.aim = null;
@@ -140,12 +156,14 @@ export class GameApp {
       if (this.run) { this.run.transition = 'arriving'; this.run.error = false; }
       this.previousTime = 0;
       this.loading = false;
+      this.platform.setLoading(false);
       this.shell.setLoading(null);
       this.renderShell();
       this.shell.setNotice(this.save.lastError);
     } catch (error) {
       if (this.disposed || generation !== this.generation) return;
       this.loading = false;
+      this.platform.setLoading(false);
       this.menu = true;
       this.shell.setLoading(null);
       if (this.run) this.run.error = true;
@@ -185,6 +203,8 @@ export class GameApp {
   }
 
   private failBattle(error: unknown): void {
+    this.platform.setGameplay(false);
+    this.platform.setLoading(false);
     this.cancelAI();
     this.pointer.cancel();
     this.game?.pause();
@@ -196,13 +216,15 @@ export class GameApp {
   private async loadOpening(level: LevelConfig, variant: BattleVariant): Promise<void> {
     const generation = ++this.generation;
     this.loading = true;
+    this.platform.setGameplay(false);
+    this.platform.setLoading(true);
     this.cancelAI(); this.pointer.cancel();
     this.scene.clearFocus();
     this.session?.dispose(); this.session = null;
     this.opening?.dispose(); this.opening = null;
     this.aim = null; this.lastFrame = null; this.previousView = null;
     this.sound.stopCurrentSounds();
-    this.shell.setError(null); this.shell.setLoading('Setting up the Opening Flick...');
+    this.shell.setError(null); this.shell.setLoading('Setting up the opening shots...');
     try {
       await this.scene.initializeHand();
       if (this.disposed || generation !== this.generation) return;
@@ -212,6 +234,7 @@ export class GameApp {
       this.scene.setLevel(level); this.scene.resetView();
       this.scene.beginCoinArrival(candidate.frame.coins.map(coin => coin.id));
       this.loading = false; this.previousTime = 0;
+      this.platform.setLoading(false);
       this.shell.setLoading(null); this.renderShell();
     } catch (error) {
       if (this.disposed || generation !== this.generation) return;
@@ -357,10 +380,12 @@ export class GameApp {
       transition: this.run?.transition ?? null,
       tutorial: this.run?.tutorial,
     };
-    this.shell.render(view, this.progress.completed, this.progress.sound, this.scene.isIntroducing, campaign);
+    this.shell.render(view, this.progress.completed, this.sound.enabled, this.scene.isIntroducing, campaign);
   }
 
   private failCampaign(error: unknown): void {
+    this.platform.setGameplay(false);
+    this.platform.setLoading(false);
     if (this.run) { this.run.error = true; this.run.transition = null; }
     this.pointer.cancel();
     this.sound.stopCurrentSounds();
@@ -388,7 +413,7 @@ export class GameApp {
       this.run.seenMarble = true;
       tips.push('Marble is more slippery than wood.');
     }
-    this.run.tutorial = tips.join('；') || undefined;
+    this.run.tutorial = tips.join(' ') || undefined;
   }
 
   private advanceCampaign(): void {
@@ -447,12 +472,13 @@ export class GameApp {
     if (this.game.view.phase === 'paused') { this.game.resume(); this.sound.unlock(); }
     else { this.game.pause(); this.sound.suspend(); }
     this.previousTime = 0;
+    this.syncPlatformGameplay();
   }
 
   private toggleSound(): void {
     this.progress.sound = !this.progress.sound;
-    this.sound.enabled = this.progress.sound;
-    if (this.progress.sound) this.sound.unlock();
+    this.sound.enabled = this.progress.sound && !this.platform.muted;
+    if (this.sound.enabled) this.sound.unlock();
     else this.sound.suspend();
     this.save.write(this.progress);
     this.shell.setNotice(this.save.lastError);
@@ -475,6 +501,15 @@ export class GameApp {
     if (!event.persisted) this.dispose();
     else this.onVisibility();
   };
+
+  private syncPlatformGameplay(): void {
+    // The portal handles focus changes itself. Report only visible game states.
+    if (document.hidden) return;
+    const phase = this.gameView?.phase;
+    this.platform.setGameplay(!this.menu && !this.loading && !this.scene.isIntroducing
+      && !this.run?.transition && !this.run?.error && !this.battle?.arriving && !this.battle?.advancing
+      && (phase === 'selecting' || phase === 'ready' || phase === 'simulating'));
+  }
 
   private readonly frame = (time: number): void => {
     if (this.disposed) return;
@@ -533,6 +568,7 @@ export class GameApp {
       this.sound.slide(this.menu ? 0 : slide);
       this.scene.render(frame, this.menu ? null : this.gameView, this.aim);
     }
+    this.syncPlatformGameplay();
     this.animation = requestAnimationFrame(this.frame);
   };
 
@@ -543,6 +579,8 @@ export class GameApp {
     cancelAnimationFrame(this.animation);
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('pagehide', this.onPageHide);
+    this.removePlatformMuteListener();
+    this.platform.dispose();
     this.pointer.dispose();
     this.browserGestures.dispose();
     this.session?.dispose();

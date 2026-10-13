@@ -1,0 +1,302 @@
+[
+  {
+    "level": "debug",
+    "message": "%cHTML5 SDK%c %c[SafeLocalStorage] using localStorage background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  color: #3d7fff",
+    "timestamp": "2026-10-13T03:40:41.009Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cDATA background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #A21CAF; border-radius: 3px; padding: 0px 4px; color: white; Local data handler initialized",
+    "timestamp": "2026-10-13T03:40:41.010Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "debug",
+    "message": "%cHTML5 SDK%c %cWith this initial data:  background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  color: #3d7fff Object",
+    "timestamp": "2026-10-13T03:40:41.010Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white; CrazyGames HTML SDK initialized Object",
+    "timestamp": "2026-10-13T03:40:41.210Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Add settings change listener (local)",
+    "timestamp": "2026-10-13T03:40:41.211Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:40:41.211Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:40:41.292Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:44:13.634Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:44:13.653Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay start (local)",
+    "timestamp": "2026-10-13T03:44:14.555Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "debug",
+    "message": "%cHTML5 SDK%c %c[SafeLocalStorage] using localStorage background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  color: #3d7fff",
+    "timestamp": "2026-10-13T03:44:16.529Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cDATA background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #A21CAF; border-radius: 3px; padding: 0px 4px; color: white; Local data handler initialized",
+    "timestamp": "2026-10-13T03:44:16.529Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "debug",
+    "message": "%cHTML5 SDK%c %cWith this initial data:  background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  color: #3d7fff Object",
+    "timestamp": "2026-10-13T03:44:16.529Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white; CrazyGames HTML SDK initialized Object",
+    "timestamp": "2026-10-13T03:44:16.737Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Add settings change listener (local)",
+    "timestamp": "2026-10-13T03:44:16.737Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:44:16.737Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:44:16.799Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:44:17.817Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:44:17.827Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay start (local)",
+    "timestamp": "2026-10-13T03:44:18.748Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay stop (local)",
+    "timestamp": "2026-10-13T03:44:21.894Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:44:26.804Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:44:26.811Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:44:31.834Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:44:31.843Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay start (local)",
+    "timestamp": "2026-10-13T03:44:32.816Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay stop (local)",
+    "timestamp": "2026-10-13T03:44:45.488Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay start (local)",
+    "timestamp": "2026-10-13T03:44:56.356Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay stop (local)",
+    "timestamp": "2026-10-13T03:45:09.593Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay start (local)",
+    "timestamp": "2026-10-13T03:45:09.925Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay stop (local)",
+    "timestamp": "2026-10-13T03:45:31.824Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:45:32.164Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:45:32.170Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:45:45.944Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:45:45.950Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting gameplay start (local)",
+    "timestamp": "2026-10-13T03:45:46.677Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "debug",
+    "message": "%cHTML5 SDK%c %c[SafeLocalStorage] using localStorage background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  color: #3d7fff",
+    "timestamp": "2026-10-13T03:46:36.278Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cDATA background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #A21CAF; border-radius: 3px; padding: 0px 4px; color: white; Local data handler initialized",
+    "timestamp": "2026-10-13T03:46:36.280Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "debug",
+    "message": "%cHTML5 SDK%c %cWith this initial data:  background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  color: #3d7fff Object",
+    "timestamp": "2026-10-13T03:46:36.280Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white; CrazyGames HTML SDK initialized Object",
+    "timestamp": "2026-10-13T03:46:36.482Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Add settings change listener (local)",
+    "timestamp": "2026-10-13T03:46:36.483Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:46:36.483Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:46:36.526Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "debug",
+    "message": "%cHTML5 SDK%c %c[SafeLocalStorage] using localStorage background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  color: #3d7fff",
+    "timestamp": "2026-10-13T03:46:52.124Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cDATA background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #A21CAF; border-radius: 3px; padding: 0px 4px; color: white; Local data handler initialized",
+    "timestamp": "2026-10-13T03:46:52.126Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "debug",
+    "message": "%cHTML5 SDK%c %cWith this initial data:  background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  color: #3d7fff Object",
+    "timestamp": "2026-10-13T03:46:52.126Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white; CrazyGames HTML SDK initialized Object",
+    "timestamp": "2026-10-13T03:46:52.325Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Add settings change listener (local)",
+    "timestamp": "2026-10-13T03:46:52.325Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading start (local)",
+    "timestamp": "2026-10-13T03:46:52.325Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  },
+  {
+    "level": "log",
+    "message": "%cHTML5 SDK%c %cGAME background-color: #6842FF; border-radius: 3px; padding: 0px 4px; color: white;  background-color: #d48f06; border-radius: 3px; padding: 0px 4px; color: white; Requesting game loading stop (local)",
+    "timestamp": "2026-10-13T03:46:52.369Z",
+    "url": "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+  }
+]
